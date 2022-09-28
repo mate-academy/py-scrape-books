@@ -19,11 +19,11 @@ class BooksSpider(scrapy.Spider):
         yield {
             "title": response.css(".product_pod > h3 > a::attr(title)").get(),
             "price": response.css(".price_color::text").get(),
-            # "amount_in_stock": response.css(".instock::text").get(),
-            # "rating": "1",
+            "amount_in_stock": response.css("#content_inner > article > table > tbody > tr:nth-child(6) > td::text").get(),
+            "rating": response.xpath('//*[@id="content_inner"]/article/div[1]/div[2]/p[2]').get(),
             # "category": "2",
-            # "description": "3",
-            # "upc": 4,
+            "description": response.css("article > p::text").get(),
+            "upc": response.xpath('//*[@id="content_inner"]/article/table/tbody/tr[1]/td'),
         }
 
         for url in all_urls:
