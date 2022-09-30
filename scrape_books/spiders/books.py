@@ -54,3 +54,8 @@ class BooksSpider(scrapy.Spider):
 
             yield scrapy.Request(book_url, callback=self.get_info_about_single_book)
 
+        next_page = response.css(".next > a:nth-child(1)::attr(href)").get()
+
+        if next_page is not None:
+            next_page_url = response.urljoin(next_page)
+            yield scrapy.Request(next_page_url, callback=self.parse)
