@@ -53,3 +53,4 @@ class BooksSpider(scrapy.Spider):
             book_url = urljoin(self.start_urls[0], url)
 
             yield scrapy.Request(book_url, callback=self.get_info_about_single_book)
+
