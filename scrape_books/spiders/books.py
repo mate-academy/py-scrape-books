@@ -13,6 +13,8 @@ class BooksSpider(scrapy.Spider):
     def get_urls_for_all_books_in_page(response: Response):
         return [
             url.css(".image_container > a ::attr(href)").get()
+            if url.css(".image_container > a ::attr(href)").get()[0:10] == "catalogue/"
+            else "catalogue/" + url.css(".image_container > a ::attr(href)").get()
             for url in response.css(".col-xs-6")
         ]
 
