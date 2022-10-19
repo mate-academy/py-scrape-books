@@ -19,7 +19,7 @@ class BooksSpider(scrapy.Spider):
                 book.css(".price_color::text").get().replace("£", "")),
             "amount_in_stock": int("".join(
                 [number for number in book.css("tr:nth-child(6) > td::text")
-                 .get()if number.isdigit()])),
+                 .get() if number.isdigit()])),
             "rating": w2n.word_to_num(
                 book.css("p.star-rating::attr(class)").get().split()[-1]),
             "category": book.css("ul > li:nth-child(3) > a::text").get(),
