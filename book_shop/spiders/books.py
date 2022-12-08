@@ -4,8 +4,9 @@ from scrapy.http import Response
 
 class BooksSpider(scrapy.Spider):
     name = "books"
-    allowed_domains = ["books.toscrape.com"]
-    start_urls = ["https://books.toscrape.com/"]
+    DOMAIN = "books.toscrape.com"
+    allowed_domains = [DOMAIN]
+    start_urls = [f"https://{DOMAIN}/"]
 
     def parse(self, response: Response, **kwargs) -> None:
         list_books = response.css(".product_pod")
