@@ -3,11 +3,15 @@ from scrapy.http import Response
 
 from books_to_scrape.items import BooksToScrapeItem
 
+NAME = "books"
+ALLOWED_DOMAINS = ["books.toscrape.com"]
+START_URL = ["https://books.toscrape.com/"]
+
 
 class BooksSpider(scrapy.Spider):
-    name = "books"
-    allowed_domains = ["books.toscrape.com"]
-    start_urls = ["https://books.toscrape.com/"]
+    name = NAME
+    allowed_domains = ALLOWED_DOMAINS
+    start_urls = START_URL
 
     def parse(self, response: Response, **kwargs) -> None:
         book_page_links = response.css(
