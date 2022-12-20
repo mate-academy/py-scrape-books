@@ -17,7 +17,9 @@ class BooksSpider(scrapy.Spider):
     def parse_book(self, response: Response) -> Generator:
         yield {
             "title": response.css(".product_main > h1::text").get(),
-            "price": float(response.css(".price_color::text").get().replace("£", "")),
+            "price": float(
+                response.css(".price_color::text").get().replace("£", "")
+            ),
             "amount_in_stock": self.amount_in_stock(
                 response.css("tr:nth-child(6) > td::text").get()
             ),
