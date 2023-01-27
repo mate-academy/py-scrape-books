@@ -16,11 +16,11 @@ class BooksSpider(scrapy.Spider):
         yield from response.follow_all(pagination_links, self.parse)
 
     @staticmethod
-    def parse_book(response):
-        def extract_with_css(query):
+    def parse_book(response: Response) -> dict:
+        def extract_with_css(query: str) -> str:
             return response.css(query).get(default='').strip()
 
-        def extract_with_css_list(query):
+        def extract_with_css_list(query: str) -> list[str]:
             return response.css(query).getall()
 
         yield {
