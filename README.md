@@ -25,3 +25,10 @@ Hints:
 - use scrapy best practices & learn how to learn new frameworks;
 - make your code as clean as possible;
 - separate scraping for different steps to make code cleaner.
+
+
+
+### Run parsing
+``
+scrapy crawl books -O books.jl
+``
