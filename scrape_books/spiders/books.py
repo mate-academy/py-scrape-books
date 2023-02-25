@@ -1,7 +1,9 @@
+from collections.abc import Generator
+
 import requests
 import scrapy
-from scrapy.http import Response
 from bs4 import BeautifulSoup
+from scrapy.http import Response
 
 
 class BooksSpider(scrapy.Spider):
@@ -10,7 +12,7 @@ class BooksSpider(scrapy.Spider):
     start_urls = ["https://books.toscrape.com/"]
     rating = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
 
-    def parse(self, response: Response, **kwargs):
+    def parse(self, response: Response, **kwargs) -> Generator[dict, None, None]:
         for book_url in response.css(".product_pod h3 a::attr(href)").getall():
             page_soup = self._parse_book_page_detail(book_url, response)
             yield {
