@@ -28,7 +28,7 @@ class BooksSpider(scrapy.Spider):
 
         if next_page:
             yield response.follow(
-                self.base_url + "/" + next_page,
+                self.base_url + next_page,
                 callback=self.get_books_links_from_page
             )
 
