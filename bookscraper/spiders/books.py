@@ -18,14 +18,16 @@ class BooksSpider(scrapy.Spider):
         if next_page is not None:
             yield response.follow(next_page, callback=self.parse)
 
-
     def parse_single_book(self, response: Response, **kwargs) -> dict:
         table = response.css(".table > tr > td::text").getall()
         yield dict(
             title=response.css(".product_main > h1::text").get(),
             price=table[2],
             amount_in_stock=table[5].replace("(", "").split()[2],
-            rating=response.css(".star-rating").xpath("./@class").extract()[0].split()[-1],
+            rating=(
+                response.css(".star-rating").xpath("./@class")
+                .extract()[0].split()[-1]
+            ),
             category=response.css(".breadcrumb > li > a::text").getall()[2],
             description=response.css(".product_page > p::text").get(),
             upc=table[0]
