@@ -15,14 +15,19 @@ class BookSpider(scrapy.Spider):
         if next_page_link is not None:
             yield response.follow(next_page_link, self.parse)
 
-    def parse_product(self, response):
+    @staticmethod
+    def parse_product(response):
         title = response.css("div.product_main > h1::text").get()
-        price = response.css(
-            "div.product_main > p.price_color::text"
-        ).re_first(r"\d+")
-        amount_in_stock = response.css(
-            "div.product_main > p.availability::text"
-        ).re_first(r"\d+")
+        price = int(
+            response.css("div.product_main > p.price_color::text").re_first(
+                r"\d+"
+            )
+        )
+        amount_in_stock = int(
+            response.css("div.product_main > p.availability::text").re_first(
+                r"\d+"
+            )
+        )
         rating = response.css(
             "div.product_main > p.star-rating::attr(class)"
         ).re_first(r"star-rating (\w+)")
