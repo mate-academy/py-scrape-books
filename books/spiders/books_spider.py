@@ -1,8 +1,7 @@
-from dataclasses import dataclass
-
 import scrapy
 
 from scrapy.http import Response
+from dataclasses import dataclass
 
 
 @dataclass
