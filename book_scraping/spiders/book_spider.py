@@ -10,10 +10,10 @@ class BookSpider(scrapy.Spider):
         self, response: scrapy.http.Response, **kwargs
     ) -> scrapy.http.Request:
         for product in response.css("article.product_pod"):
-            product_link: str = product.css("h3 > a::attr(href)").get()
+            product_link = product.css("h3 > a::attr(href)").get()
             yield response.follow(product_link, self.parse_product)
 
-        next_page_link: str = response.css("li.next > a::attr(href)").get()
+        next_page_link = response.css("li.next > a::attr(href)").get()
         if next_page_link is not None:
             yield response.follow(next_page_link, self.parse)
 
