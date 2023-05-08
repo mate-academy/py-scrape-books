@@ -4,13 +4,7 @@ from scrapy.http import Response
 import scrapy
 
 
-RATING = {
-    "One": 1,
-    "Two": 2,
-    "Three": 3,
-    "Four": 4,
-    "Five": 5
-}
+RATING = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
 
 
 class BooksSpider(scrapy.Spider):
@@ -37,21 +31,16 @@ class BooksSpider(scrapy.Spider):
             "category": category,
             "description": description,
             "upc": upc,
-            "link": link
+            "link": link,
         }
 
     def parse(self, response: Response, **kwargs):
         for book in response.css(".image_container"):
             yield scrapy.Request(
                 response.urljoin(book.css("a::attr(href)").get()),
-                callback=self.parse_book_page
+                callback=self.parse_book_page,
             )
 
         next_page = response.css(".next").css("a::attr(href)").get()
         if next_page is not None:
             yield response.follow(next_page, callback=self.parse)
-        
-
-# TODO: силкі на кожну книжку
-# test1=response.css(".image_container")
-# test1.css("a::attr(href)").getall()
