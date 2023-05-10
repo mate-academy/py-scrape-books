@@ -1,5 +1,7 @@
 import scrapy
 
+POINTS = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
+
 
 class BookSpider(scrapy.Spider):
     name = "book"
@@ -31,7 +33,7 @@ class BookSpider(scrapy.Spider):
             )
         )
         rating = int(
-            {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}.get(
+            POINTS.get(
                 response.css(
                     "div.product_main > p.star-rating::attr(class)"
                 ).re_first(r"star-rating (\w+)")
