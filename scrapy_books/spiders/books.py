@@ -1,8 +1,8 @@
-import re
-
 import cssselect
 import scrapy
 from scrapy.http import Response
+
+from scrapy_books.items import BookItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -34,20 +34,21 @@ class BooksSpider(scrapy.Spider):
         return book_url
 
     def parse_detail_book_page(self, response: Response) -> None:
-        yield {
-            "title": response.css(".product_main h1::text").get(),
-            "price": response.css(
-                ".product_main p::text").get().replace("£", ""),
-            "amount_in_stock": re.findall(
-                r"\d+", response.css("table tr")[5].css("td::text").get()
-            )[0],
-            "rating": response.css(
-                "p.star-rating").attrib["class"].split()[-1],
-            "category": response.xpath(
-                "//ul[@class='breadcrumb']/li[@class='active']/preceding-sibling::li[1]/a/text()"
-            ).get(),
-            "description": response.xpath(
-                "//div[@id='product_description']/following-sibling::p/text()"
-            ).get(),
-            "upc": response.css("table tr")[0].css("td::text").get(),
-        }
+        book_item = BookItem()
+
+        book_item["title"] = response.css(".product_main h1::text").get(),
+        book_item["price"] = response.css(".product_main p::text").get(),
+        book_item["amount_in_stock"] = response.css(
+            "table tr")[5].css("td::text"
+                               ).get(),
+        book_item["rating"] = response.css("p.star-rating").attrib["class"],
+        book_item["category"] = response.xpath(
+            "//ul[@class='breadcrumb']/li[@class='active']/"
+            "preceding-sibling::li[1]/a/text()"
+        ).get(),
+        book_item["description"] = response.xpath(
+            "//div[@id='product_description']/following-sibling::p/text()"
+        ).get(),
+        book_item["upc"] = response.css("table tr")[0].css("td::text").get(),
+
+        yield book_item
