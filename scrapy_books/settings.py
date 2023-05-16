@@ -12,8 +12,10 @@ BOT_NAME = "scrapy_books"
 SPIDER_MODULES = ["scrapy_books.spiders"]
 NEWSPIDER_MODULE = "scrapy_books.spiders"
 
+FEEDS = {
+    "booksdata.json": {"format": "json"},
+}
 
-# Crawl responsibly by identifying yourself (and your website) on the user-agent
 # USER_AGENT = "scrapy_books (+http://www.yourdomain.com)"
 
 # Obey robots.txt rules
@@ -38,7 +40,7 @@ ROBOTSTXT_OBEY = False
 
 # Override the default request headers:
 # DEFAULT_REQUEST_HEADERS = {
-#    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+
 #    "Accept-Language": "en",
 # }
 
@@ -62,8 +64,9 @@ ROBOTSTXT_OBEY = False
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
+
 ITEM_PIPELINES = {
-   "scrapy_books.pipelines.ScrapyBooksPipeline": 300,
+    "scrapy_books.pipelines.ScrapyBooksPipeline": 300,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -80,7 +83,6 @@ ITEM_PIPELINES = {
 # AUTOTHROTTLE_DEBUG = False
 
 # Enable and configure HTTP caching (disabled by default)
-# See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#httpcache-middleware-settings
 # HTTPCACHE_ENABLED = True
 # HTTPCACHE_EXPIRATION_SECS = 0
 # HTTPCACHE_DIR = "httpcache"

@@ -7,9 +7,12 @@ import re
 # useful for handling different item types with a single interface
 from itemadapter import ItemAdapter
 
+from scrapy_books.items import BookItem
+from scrapy_books.spiders.books import BooksSpider
+
 
 class ScrapyBooksPipeline:
-    def process_item(self, item, spider):
+    def process_item(self, item: BookItem, spider: BooksSpider) -> BookItem:
 
         adapter = ItemAdapter(item)
 

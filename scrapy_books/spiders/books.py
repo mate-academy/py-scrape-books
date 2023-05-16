@@ -9,6 +9,13 @@ class BooksSpider(scrapy.Spider):
     name = "books"
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
+    start_urls_string = "https://books.toscrape.com/"
+
+    custom_settings = {
+        "FEEDS": {
+            "booksdata.jl": {"format": "jl", "overwrite": True},
+        }
+    }
 
     def parse(self, response: Response, **kwargs) -> None:
         books_page = response.css(".product_pod")
@@ -27,9 +34,9 @@ class BooksSpider(scrapy.Spider):
         relative_url = book.css("h3 a ::attr(href)").get()
 
         if "catalogue/" in relative_url:
-            book_url = "https://books.toscrape.com/" + relative_url
+            book_url = self.start_urls_string + relative_url
         else:
-            book_url = "https://books.toscrape.com/catalogue/" + relative_url
+            book_url = self.start_urls_string + "catalogue/" + relative_url
 
         return book_url
 
