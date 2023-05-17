@@ -24,20 +24,22 @@ class BooksSpider(scrapy.Spider):
 
     @staticmethod
     def parse_single_product(response: Response) -> Generator:
+        rating_num = {
+            "One": 1,
+            "Two": 2,
+            "Three": 3,
+            "Four": 4,
+            "Five": 5,
+        }
         yield {
             "title": response.css(".product_main > h1::text").get(),
             "price": float(response.css(".product_main > .price_color::text").get().strip("£")),
             "in_stock": int(response.css(
                 ".product_main > p.instock.availability::text"
             ).getall()[1].strip().split()[-2].strip('(')),
-            "rating": response.css(".product_main > .star-rating").get().split()[2].strip('">'),
+            "rating": rating_num.get(response.css(".product_main > .star-rating").get().split()[2].strip('">'), 0),
             "category": response.css(".breadcrumb > li > a::text").getall()[2],
             "description": response.css(".product_page > p::text").get(),
             "upc": response.css(
                 ".table-striped ").get().split()[4].strip("<th>UPC</th><td>").strip("</td>"),
         }
-
-
-if __name__ == '__main__':
-    pass
-
