@@ -38,7 +38,7 @@ class BooksSpider(scrapy.Spider):
                 "price": float(
                     book.css(".price_color::text").get().replace("£", "")
                 ),
-                "amount_in_stock": self._parse_single_book(response, book)[
+                "amount_in_stock": self._parse_single_book()[
                     "amount_in_stock"
                 ],
                 "rating": book.css("p::attr(class)")
