@@ -48,7 +48,7 @@ class BooksSpider(scrapy.Spider):
                 .get()
                 .strip(),
                 "description": description,
-                "upc": self._parse_single_book(response, book)["upc"],
+                "upc": self._parse_single_book()["upc"],
             }
 
         next_page = response.css("li.next a::attr(href)").get()
