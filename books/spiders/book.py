@@ -30,7 +30,7 @@ class BookSpider(scrapy.Spider):
     def parse(self, response: Response, **kwargs) -> dict | Response:
         for book in response.css(".product_pod"):
             detailed_page_url = book.css("h3 > a::attr(href)").get()
-            amount, category, description, upc = self._get_amount_in_stock(
+            amount, category, description, upc = self._parse_detailed_page(
                 detailed_page_url, response)
             yield {
                 "title": book.css("h3 > a::attr(title)").get(),
@@ -47,7 +47,7 @@ class BookSpider(scrapy.Spider):
             if next_page is not None:
                 yield response.follow(next_page, callback=self.parse)
 
-    def _get_amount_in_stock(
+    def _parse_detailed_page(
             self, url: str, response: Response) -> list[int | str]:
         self.driver.get(urljoin(response.url, url))
         amount_in_stock = int(self.driver.find_element(
