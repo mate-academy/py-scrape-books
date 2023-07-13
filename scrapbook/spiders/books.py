@@ -24,23 +24,18 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page_link, self.parse)
 
     def parse_book_details(self, response: Response):
-        category = response.css(".breadcrumb li:nth-child(3) a::text").get()
-        availability = response.css(
-            ".instock.availability::text").re_first(r"\d+"
-        )
-        description = response.css("#product_description + p::text").get()
-        upc = response.css("tr:nth-of-type(1) td::text").get()
 
         book_info = {
             "title": response.css(".product_main h1::text").get(),
             "price": response.css(".product_main .price_color::text").get(),
-            "amount_in_stock": availability.strip() if availability else None,
+            "amount_in_stock": response.css(
+                ".instock.availability::text").re_first(r"\d+"),
             "rating": response.css(
                 ".product_main .star-rating::attr(class)"
             ).re_first(r"star-rating\s(.+)"),
-            "category": category.strip() if category else None,
-            "description": description.strip() if description else None,
-            "upc": upc.strip() if upc else None,
+            "category": response.css(".breadcrumb li:nth-child(3) a::text").get(),
+            "description": response.css("#product_description + p::text").get(),
+            "upc": response.css("tr:nth-of-type(1) td::text").get(),
         }
 
         with open("books.jl", "a") as f:
