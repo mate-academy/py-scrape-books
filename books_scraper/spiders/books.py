@@ -1,4 +1,6 @@
 import scrapy
+import wordtodigits
+
 from scrapy.http import Response
 
 
@@ -24,5 +26,19 @@ class BooksSpider(scrapy.Spider):
     @staticmethod
     def parse_single_book(response: Response) -> None:
         yield {
-                "title": response.css(".product_main > h1::text").get()
+                "title": response.css(".product_main > h1::text").get(),
+                "price": float(
+                    response.css(".price_color::text").get().replace("£", "")
+                ),
+                "amount_in_stock":  int(
+                    response.css(".instock").get().replace("(", "").split()[-3]
+                ),
+                "rating": int(wordtodigits.convert(
+                    response.css("p.star-rating::attr(class)").get().split()[-1]
+                )),
+                "category": response.css(
+                    ".breadcrumb > li:nth-child(3) > a::text"
+                ).get(),
+                "description": response.css(".product_page > p::text").get(),
+                "upc": response.css("tr:nth-of-type(1) td::text").get(),
             }
