@@ -25,24 +25,18 @@ class BooksSpider(scrapy.Spider):
             )
 
     def parse_book(self, response: HtmlResponse):
-        book_info = BooksScrapperItem()
-
-        book_info["title"] = response.css("h1::text").get()
-        book_info["price"] = float(
-            response.css("p.price_color::text").get().replace("£", "")
+        yield BooksScrapperItem(
+            title=response.css("h1::text").get(),
+            price=float(response.css("p.price_color::text").get().replace("£", "")),
+            amount_in_stock=int(
+                response.css(".instock.availability::text").re_first(r"\d+")
+            ),
+            rating=w2n.word_to_num(
+                response.css("p.star-rating::attr(class)").get().split()[1]
+            ),
+            category=response.css("ul.breadcrumb li:nth-child(3) a::text").get(),
+            description=response.css("article.product_page > p::text").get(),
+            upc=response.css(
+                "table.table.table-striped tr:nth-child(1) td::text"
+            ).get(),
         )
-        book_info["amount_in_stock"] = int(
-            response.css(".instock.availability::text").re_first(r"\d+")
-        )
-        book_info["rating"] = w2n.word_to_num(
-            response.css("p.star-rating::attr(class)").get().split()[1]
-        )
-        book_info["category"] = response.css(
-            "ul.breadcrumb li:nth-child(3) a::text"
-        ).get()
-        book_info["description"] = response.css("article.product_page > p::text").get()
-        book_info["upc"] = response.css(
-            "table.table.table-striped tr:nth-child(1) td::text"
-        ).get()
-
-        yield book_info
