@@ -21,25 +21,24 @@ class BooksSpider(scrapy.Spider):
 
     @staticmethod
     def parse_single_book(response: Response) -> None:
-        book = {}
-
         try:
-            book["title"] = response.css(".product_main > h1::text").get()
-            book["price"] = float(
-                response.css(".price_colorrrr::text").get().replace("£", "")
-            )
-            book["amount_in_stock"] = int(
-                response.css(".instock").get().replace("(", "").split()[-3]
-            )
-            book["rating"] = int(wordtodigits.convert(
-                response.css("p.star-rating::attr(class)").get().split()[-1]
-            ))
-            book["category"] = response.css(
-                ".breadcrumb > li:nth-child(3) > a::text"
-            ).get()
-            book["description"] = response.css(".product_page > p::text").get()
-            book["upc"] = response.css("tr:nth-of-type(1) td::text").get()
-            yield book
+            yield {
+                "title": response.css(".product_main > h1::text").get(),
+                "price": float(
+                    response.css(".price_color::text").get().replace("£", "")
+                ),
+                "amount_in_stock": int(
+                    response.css(".instock").get().replace("(", "").split()[-3]
+                ),
+                "rating": int(wordtodigits.convert(
+                    response.css("p.star-rating::attr(class)").get().split()[-1]
+                )),
+                "category": response.css(
+                    ".breadcrumb > li:nth-child(3) > a::text"
+                ).get(),
+                "description": response.css(".product_page > p::text").get(),
+                "upc": response.css("tr:nth-of-type(1) td::text").get(),
+            }
 
         except Exception as error:
             print(
