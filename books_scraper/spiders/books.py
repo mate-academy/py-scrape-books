@@ -30,9 +30,11 @@ class BooksSpider(scrapy.Spider):
                 "amount_in_stock": int(
                     response.css(".instock").get().replace("(", "").split()[-3]
                 ),
-                "rating": int(wordtodigits.convert(
-                    response.css("p.star-rating::attr(class)").get().split()[-1]
-                )),
+                "rating": int(
+                    wordtodigits.convert(response.css(
+                        "p.star-rating::attr(class)"
+                    ).get().split()[-1])
+                ),
                 "category": response.css(
                     ".breadcrumb > li:nth-child(3) > a::text"
                 ).get(),
