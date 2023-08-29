@@ -36,7 +36,6 @@ class BooksSpider(scrapy.Spider):
         self.driver.close()
 
         self.driver = self._get_webdriver()
-        print("Driver has changed")
 
         if next_page:
             yield response.follow(next_page, callback=self.parse)
@@ -94,7 +93,7 @@ class BooksSpider(scrapy.Spider):
     def _get_webdriver(self) -> WebDriver:
         chrome_options = webdriver.ChromeOptions()
 
-        # chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--headless")
         chrome_options.add_argument(
             f"user-agent={self._get_random_user_agent()}"
         )
@@ -133,7 +132,6 @@ class BooksSpider(scrapy.Spider):
             "AppleWebKit/602.1.50 (KHTML, like Gecko) "
             "Version/10.0 Mobile/15E148 Safari/602.1",
         ]
-        print(len(user_agents), "len")
         return random.choice(user_agents)
 
     def _get_rating(self, element: WebElement) -> int:
