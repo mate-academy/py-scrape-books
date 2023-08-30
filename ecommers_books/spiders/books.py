@@ -26,7 +26,7 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(book_detail, callback=self.parse)
 
         next_page = response.css("li.next > a::attr(href)").get()
-        if next_page is not None:
+        if next_page:
             next_page_url = response.urljoin(next_page)
             yield response.follow(
                 next_page_url, callback=self.get_book_detail_page
@@ -45,7 +45,7 @@ class BooksSpider(scrapy.Spider):
             rating=RATING_DICT.get(
                 response.css("p.star-rating::attr(class)").get().split()[-1]
             ),
-            category=book_table[1],
+            category=response.css("ul.breadcrumb > li > a::text").getall()[2],
             description=max(response.css("p").getall()).replace(
                 "<p>", ""
             ).replace(
