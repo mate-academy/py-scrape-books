@@ -7,10 +7,6 @@ from scrapy.http import Response
 from twisted.internet.asyncioreactor import AsyncioSelectorReactor
 
 
-reactor = AsyncioSelectorReactor
-reactor._handleSignals = lambda x: ...
-
-
 class BooksSpider(scrapy.Spider):
     name = "books"
     allowed_domains = ["books.toscrape.com"]
