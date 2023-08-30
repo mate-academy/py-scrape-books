@@ -1,136 +1,87 @@
-import random
-from typing import Any
-
 import scrapy
-from scrapy import Selector, Request
+from scrapy import Request
 from scrapy.http import Response
-from selenium import webdriver
-from selenium.webdriver.chrome.webdriver import WebDriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.remote.webelement import WebElement
+
+from books_to_scrape.items import BooksToScrapeItem
 
 
 class BooksSpider(scrapy.Spider):
     name = "books"
     allowed_domains = ["books.toscrape.com"]
-    start_urls = ["https://books.toscrape.com/"]
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
+    def start_requests(self):
+        base_url = "https://books.toscrape.com/"
+        headers = {
+            "User-Agent":
+                "Mozilla/5.0 (X11; CrOS x86_64 8172.45.0) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/51.0.2704.64 Safari/537.36",
+            "Referer": "https://www.google.com/"
+        }
 
-        self.driver = self._get_webdriver()
-
-    def close(self, reason: Any) -> None:
-        self.driver.close()
+        first_page = 1
+        last_page = 50
+        for i in range(first_page, last_page + 1):
+            url = base_url + f"/catalogue/page-{i}.html"
+            yield scrapy.Request(
+                url=url, headers=headers, callback=self.parse
+            )
 
     def parse(self, response: Response, **kwargs) -> Request:
-        for book in response.css("article.product_pod"):
-            yield self._parse_book_detail_info(response, book)
+        book_href_list = response.css(
+            "article.product_pod > h3 > a::attr(href)"
+        ).getall()
+        for href in book_href_list:
+            yield response.follow(
+                href, callback=self._parse_book_detail_info
+            )
 
-        next_page = response.css(".next > a::attr(href)").get()
-
-        self.driver.close()
-
-        self.driver = self._get_webdriver()  # to change user-agent header
-
-        if next_page:
-            yield response.follow(next_page, callback=self.parse)
+    def _parse_books(self, response: Response) -> Response:
+        book_href_list = response.css(
+            "article.product_pod > h3 > a::attr(href)"
+        ).getall()
+        for href in book_href_list:
+            yield response.follow(
+                href, callback=self._parse_book_detail_info
+            )
 
     def _parse_book_detail_info(
             self,
             response: Response,
-            book: Selector
-    ) -> dict[str]:
+    ) -> BooksToScrapeItem:
+        book = BooksToScrapeItem()
 
-        book_detail_url = response.urljoin(
-            book.css("h3 > a::attr(href)").get()
+        book["title"] = response.css(
+            "div.col-sm-6.product_main > h1::text"
+        ).get()
+        book["price"] = float(response.css(
+            ".price_color::text"
+        ).get().replace("£", ""))
+        book["amount_in_stock"] = int(response.css(
+            ".instock.availability::text"
+        ).getall()[1].split()[-2][1:])
+
+        book["rating"] = self._get_rating(
+            response.css(
+                ".star-rating::attr(class)"
+            ).get()
         )
-
-        self.driver.get(book_detail_url)
-
-        title = self.driver.find_element(
-            By.CSS_SELECTOR,
-            "div.col-sm-6.product_main > h1"
-        ).text
-        price = float(self.driver.find_element(
-            By.CLASS_NAME, "price_color"
-        ).text.replace("£", ""))
-        amount_in_stock = int(self.driver.find_element(
-            By.CSS_SELECTOR, ".instock.availability"
-        ).text.split()[2][1:])
-        rating = self._get_rating(
-            self.driver.find_element(
-                By.CLASS_NAME, "star-rating"
-            )
+        book["category"] = response.css(
+            ".breadcrumb > li > a::text"
+        ).getall()[-1]
+        book["description"] = self._get_description(
+            response.css(
+                "#content_inner > article > p::text"
+            ).getall()
         )
-        category = self.driver.find_elements(
-            By.CSS_SELECTOR, ".breadcrumb > li"
-        )[2].text
-        description = self._get_description(
-            self.driver.find_elements(
-                By.CSS_SELECTOR, "#content_inner > article > p"
-            )
-        )
-        upc = self.driver.find_element(
-            By.CSS_SELECTOR,
-            ".table.table-striped > tbody > tr:nth-child(1) > td"
-        ).text
+        book["upc"] = response.css(
+            "table > tr > td::text"
+        ).get()
 
-        return {
-            "title": title,
-            "price": price,
-            "amount_in_stock": amount_in_stock,
-            "rating": rating,
-            "category": category,
-            "description": description,
-            "upc": upc,
-        }
+        return book
 
-    def _get_webdriver(self) -> WebDriver:
-        chrome_options = webdriver.ChromeOptions()
-
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument(
-            f"user-agent={self._get_random_user_agent()}"
-        )
-
-        return webdriver.Chrome(options=chrome_options)
-
-    def _get_random_user_agent(self) -> str:
-        user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/42.0.2311.135 Safari/537.36 Edge/12.246",
-
-            "Mozilla/5.0 (X11; CrOS x86_64 8172.45.0) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/51.0.2704.64 Safari/537.36",
-
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) "
-            "AppleWebKit/601.3.9 (KHTML, like Gecko) "
-            "Version/9.0.2 Safari/601.3.9",
-
-            "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) "
-            "Gecko/20100101 Firefox/15.0.1",
-
-            "Mozilla/5.0 "
-            "(Linux; Android 12; SM-X906C Build/QP1A.190711.020; wv) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Version/4.0 Chrome/80.0.3987.119 "
-            "Mobile Safari/537.36",
-
-            "Mozilla/5.0 (iPhone14,3; U; CPU iPhone OS 15_0 like Mac OS X) "
-            "AppleWebKit/602.1.50 (KHTML, like Gecko) "
-            "Version/10.0 Mobile/19A346 Safari/602.1",
-
-            "Mozilla/5.0 "
-            "(iPhone13,2; U; CPU iPhone OS 14_0 like Mac OS X) "
-            "AppleWebKit/602.1.50 (KHTML, like Gecko) "
-            "Version/10.0 Mobile/15E148 Safari/602.1",
-        ]
-        return random.choice(user_agents)
-
-    def _get_rating(self, element: WebElement) -> int:
+    @staticmethod
+    def _get_rating(class_name: str) -> int:
         rating_dict = {
             "One": 1,
             "Two": 2,
@@ -140,11 +91,12 @@ class BooksSpider(scrapy.Spider):
         }
 
         return rating_dict[
-            element.get_attribute("class").split()[-1]
+            class_name.split()[-1]
         ]
 
-    def _get_description(self, elements: list[WebElement]) -> str:
-        if elements:
-            return elements[0].text
+    @staticmethod
+    def _get_description(descriptions: list[str]) -> str:
+        if descriptions:
+            return descriptions[0]
         else:
             return "No description"
