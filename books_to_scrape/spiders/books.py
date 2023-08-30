@@ -8,10 +8,6 @@ from selenium import webdriver
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
-from twisted.internet.asyncioreactor import AsyncioSelectorReactor
-
-reactor = AsyncioSelectorReactor
-reactor._handleSignals = lambda x: 0
 
 
 class BooksSpider(scrapy.Spider):
@@ -35,7 +31,7 @@ class BooksSpider(scrapy.Spider):
 
         self.driver.close()
 
-        self.driver = self._get_webdriver()
+        self.driver = self._get_webdriver()  # to change user-agent header
 
         if next_page:
             yield response.follow(next_page, callback=self.parse)
