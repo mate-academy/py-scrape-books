@@ -20,19 +20,24 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     @staticmethod
-    def parse_single_book(book) -> dict[str, str]:
+    def parse_single_book(book_page: Response) -> dict[str, str]:
         detail_info = {
-            "title": book.css(".product_main > h1::text").get(),
-            "price": book.css(".price_color::text").get(),
-            "amount_in_stock": book.css("tr:nth-child(6) > td::text").get().replace("(", "").split(" ")[2],
-            "rating": book.css(
-                    "p.star-rating::attr(class)"
-                ).get().split()[1],
-            "category": book.css(
-                ".breadcrumb > li:nth-child(3) a::text"
-            ).get(),
-            "description": book.css("article > p::text").get(),
-            "upc": book.css(".table tr:nth-child(1) td::text").get(),
+            "title": book_page.css(".product_main > h1::text").get(),
+            "price": book_page.css(".price_color::text").get(),
+            "amount_in_stock": (
+                book_page.css("tr:nth-child(6) > td::text").get()
+                .replace("(", "")
+                .split(" ")[2]
+            ),
+            "rating": (
+                book_page.css("p.star-rating::attr(class)").get()
+                .split()[1]
+            ),
+            "category": (
+                book_page.css(".breadcrumb > li:nth-child(3) a::text").get()
+            ),
+            "description": book_page.css("article > p::text").get(),
+            "upc": book_page.css(".table tr:nth-child(1) td::text").get(),
         }
 
         yield detail_info
