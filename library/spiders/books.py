@@ -23,7 +23,7 @@ class BooksSpider(scrapy.Spider):
             )
 
         next_page = response.css(".next > a::attr(href)").get()
-        if next_page is not None:
+        if next_page:
             yield response.follow(next_page, callback=self.parse)
 
     def get_single_book(self, response: Response) -> Dict:
