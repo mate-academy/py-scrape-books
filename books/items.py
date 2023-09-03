@@ -13,8 +13,3 @@ class BookItem(scrapy.Item):
     category = scrapy.Field()
     description = scrapy.Field()
     upc = scrapy.Field()
-
-
-
-
-
