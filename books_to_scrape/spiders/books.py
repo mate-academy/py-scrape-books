@@ -1,3 +1,4 @@
+from typing import Generator, Any
 import scrapy
 
 
@@ -7,7 +8,7 @@ class BooksSpider(scrapy.Spider):
     start_urls = ["https://books.toscrape.com/catalogue/page-1.html"]
 
     @staticmethod
-    def parse_detail_page(response: scrapy.http.Response) -> dict[str, str]:
+    def parse_detail_page(response: scrapy.http.Response) -> dict[str, str] | None:
         yield {
             "title": response.css("h1::text").get(),
             "price": float(response.css(
@@ -32,7 +33,7 @@ class BooksSpider(scrapy.Spider):
             ).get(),
         }
 
-    def parse(self, response: scrapy.http.Response, **kwargs) -> None:
+    def parse(self, response: scrapy.http.Response, **kwargs) -> Generator[Any, None, None]:
         detail_links_per_page = response.css(
             ".image_container > a::attr(href)"
         ).getall()
