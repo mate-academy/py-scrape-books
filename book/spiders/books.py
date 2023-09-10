@@ -4,6 +4,8 @@ from urllib.parse import urljoin
 import scrapy
 from scrapy.http import Response
 
+RATINGS = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
+
 
 class BooksSpider(scrapy.Spider):
     name = "books"
@@ -25,7 +27,6 @@ class BooksSpider(scrapy.Spider):
 
     @staticmethod
     def get_single_book(response: Response) -> Dict:
-        ratings = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
 
         yield {
             "title": response.css(".product_main > h1::text").get(),
@@ -37,7 +38,7 @@ class BooksSpider(scrapy.Spider):
                     r"\((\d+) available\)"
                 )
             ),
-            "rating": ratings.get(
+            "rating": RATINGS.get(
                 response.css(".star-rating::attr(class)").get().split()[1], 0
             ),
             "category": response.css(
