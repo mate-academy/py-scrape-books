@@ -31,13 +31,13 @@ class BookInfoSpider(scrapy.Spider):
                 .get()
                 .split()[2][1:]
             ),
-            "rating": self._check_raiting(response),
+            "rating": self._check_rating(response=response),
             "category": response.css(".breadcrumb li")[2].css("a::text").get(),
             "description": response.css(".product_page > p::text").get(),
             "upc": response.css(".table-striped tr")[0].css("td::text").get(),
         }
 
-    def _check_raiting(self, response: Response) -> int:
+    def _check_rating(self, response: Response) -> int:
         rating = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
         pars_rating = (
             response.css(".product_main .star-rating::attr(class)")
