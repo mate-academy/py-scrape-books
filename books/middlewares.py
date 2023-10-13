@@ -33,8 +33,8 @@ class BooksSpiderMiddleware:
         # it has processed the response.
 
         # Must return an iterable of Request, or item objects.
-        for i in result:
-            yield i
+        for spider_ in result:
+            yield spider_
 
     def process_spider_exception(self, response, exception, spider):
         # Called when a spider or process_spider_input() method
@@ -49,8 +49,8 @@ class BooksSpiderMiddleware:
         # that it doesn’t have a response associated.
 
         # Must return only requests (not items).
-        for r in start_requests:
-            yield r
+        for request in start_requests:
+            yield request
 
     def spider_opened(self, spider):
         spider.logger.info("Spider opened: %s" % spider.name)
@@ -64,9 +64,9 @@ class BooksDownloaderMiddleware:
     @classmethod
     def from_crawler(cls, crawler):
         # This method is used by Scrapy to create your spiders.
-        s = cls()
-        crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
-        return s
+        scrap = cls()
+        crawler.signals.connect(scrap.spider_opened, signal=signals.spider_opened)
+        return scrap
 
     def process_request(self, request, spider):
         # Called for each request that goes through the downloader
