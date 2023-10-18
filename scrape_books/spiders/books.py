@@ -17,7 +17,7 @@ class BooksSpider(scrapy.Spider):
         number_str = text.split()[-1]
         number_dict = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
 
-        return number_dict.get(number_str, None)
+        return number_dict.get(number_str)
 
     def parse(self, response: Response, **kwargs) -> dict:
         for product in response.css(".product_pod"):
