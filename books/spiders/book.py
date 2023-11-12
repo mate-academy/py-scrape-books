@@ -1,3 +1,5 @@
+from typing import Generator
+
 import scrapy
 from scrapy.http import Response
 from scrapy.spiders.sitemap import re
@@ -8,14 +10,18 @@ class BookSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs):
+    def parse(
+        self, response: Response, **kwargs
+    ) -> Generator[dict, None, None]:
         book_links = response.css(".product_pod > h3 > a::attr(href)")
         yield from response.follow_all(book_links, callback=self.parse_book)
 
         next_links = response.css(".pager > .next > a::attr(href)")
         yield from response.follow_all(next_links, callback=self.parse)
 
-    def parse_book(self, response: Response, **kwargs):
+    def parse_book(
+        self, response: Response, **kwargs
+    ) -> Generator[dict, None, None]:
         rating_mappings = {
             "one": 1,
             "two": 2,
