@@ -18,16 +18,12 @@ class BooksSpider(scrapy.Spider):
             "title": response.css("h1::text").get(),
             "price": response.css(".price_color::text").get(),
             "amount_in_stock": response.css(".instock::text").re_first(r"\d+"),
-            "rating": response.css(".star-rating::attr(class)")
-            .get()
+            "rating": response.css(".star-rating::attr(class)").get()
             .split(" ")[-1],
-            "category": response.css(".breadcrumb > li")[2]
-            .css("a::text")
+            "category": response.css(".breadcrumb > li")[2].css("a::text")
             .get(),
-            "description": response.css(
-                "#product_description ~ p::text"
-            ).get(),
-            "upc": response.css(".table-striped > tr")[0]
-            .css("td::text")
+            "description": response.css("#product_description ~ p::text")
+            .get(),
+            "upc": response.css(".table-striped > tr")[0].css("td::text")
             .get(),
         }
