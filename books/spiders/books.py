@@ -36,6 +36,6 @@ class BooksSpider(scrapy.Spider):
             book_url = book.css(".image_container > a[href]::attr(href)").get()
             yield response.follow(book_url, callback=self.parse_single_book)
 
-        next_page = response.css(".next > a[href]::attr(href)").get()
-        if next_page is not None:
-            yield response.follow(next_page, callback=self.parse)
+        # next_page = response.css(".next > a[href]::attr(href)").get()
+        # if next_page is not None:
+        #     yield response.follow(next_page, callback=self.parse)
