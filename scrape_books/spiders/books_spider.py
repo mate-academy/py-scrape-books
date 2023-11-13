@@ -12,6 +12,11 @@ class BooksSpider(scrapy.Spider):
                 book_detail_link, callback=self.parse_book_info
             )
 
+        next_page = response.css(".next > a::attr(href)").get()
+
+        if next_page is not None:
+            yield response.follow(next_page, callback=self.parse)
+
     @staticmethod
     def parse_book_info(response: Response) -> None:
         yield {
