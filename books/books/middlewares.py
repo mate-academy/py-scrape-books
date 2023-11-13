@@ -1,3 +1,4 @@
+# flake8: noqa
 # Define here the models for your spider middleware
 #
 # See documentation in:
