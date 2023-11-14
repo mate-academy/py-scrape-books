@@ -1,7 +1,6 @@
-from typing import Generator, Any
+from typing import Generator
 
 import scrapy
-from scrapy import Request
 
 from scrapy.http import Response
 
@@ -11,7 +10,7 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs) -> Generator[Any]:
+    def parse(self, response: Response, **kwargs) -> Generator[scrapy.Request | Response, None, None]:
         for card in response.css(".product_pod"):
             detailed_url = response.urljoin(card.css("a::attr(href)").get())
             yield scrapy.Request(url=detailed_url, callback=self.parse_single_book)
@@ -22,7 +21,7 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     @staticmethod
-    def parse_single_book(response: Response) -> Generator[dict]:
+    def parse_single_book(response: Response) -> Generator[dict, None, None]:
         yield {
             "title": response.css(".product_main > h1::text").get(),
             "price": float(response.css(".price_color::text").get().replace("£", "")),
