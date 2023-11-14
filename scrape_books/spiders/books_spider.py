@@ -1,14 +1,14 @@
 from typing import Generator
 
 import scrapy
-from scrapy.http import Response
+from scrapy.http import Response, Request
 
 
 class BooksSpider(scrapy.Spider):
     name = "books"
     start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs) -> None:
+    def parse(self, response: Response, **kwargs) -> Generator[Request, None, None]:
         for book_detail_link in response.css("h3 > a::attr(href)").getall():
             yield response.follow(
                 book_detail_link, callback=self.parse_book_info
