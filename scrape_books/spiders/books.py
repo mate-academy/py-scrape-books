@@ -1,3 +1,5 @@
+from typing import Generator
+
 import scrapy
 
 from scrapy.http import Response
@@ -19,7 +21,7 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     @staticmethod
-    def parse_single_book(response: Response) -> dict:
+    def parse_single_book(response: Response) -> Generator[dict]:
         yield {
             "title": response.css(".product_main > h1::text").get(),
             "price": float(response.css(".price_color::text").get().replace("£", "")),
