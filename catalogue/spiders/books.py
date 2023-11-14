@@ -1,3 +1,5 @@
+from typing import Generator
+
 import scrapy
 from scrapy.http import Response
 
@@ -9,7 +11,9 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs) -> None:
+    def parse(self, response: Response, **kwargs) -> Generator[
+        scrapy.Request, None, None
+    ]:
         for book in response.css(".product_pod"):
             yield scrapy.Request(
                 url=response.urljoin(book.css("h3 a::attr(href)").get()),
@@ -21,26 +25,18 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, self.parse)
 
     @staticmethod
-    def _get_amount_in_stock(response: Response) -> int:
-        return int(
-            response.css(".instock.availability::text").re_first(r"\d+")
-        )
-
-    @staticmethod
-    def _get_rating(response: Response) -> int:
-        return w2n.word_to_num(
-            response.css(".star-rating::attr(class)").get().split()[-1]
-        )
-
-    @staticmethod
-    def _parse_detail_book(response: Response) -> dict:
+    def _parse_detail_book(response: Response) -> Generator[dict, None, None]:
         yield {
             "title": response.css("h1::text").get(),
             "price": response.css(
                 ".price_color::text"
             ).get().replace("£", ""),
-            "amount_in_stock": BooksSpider._get_amount_in_stock(response),
-            "rating": BooksSpider._get_rating(response),
+            "amount_in_stock": response.css(
+                ".instock.availability::text"
+            ).re_first(r"\d+"),
+            "rating": w2n.word_to_num(
+                response.css(".star-rating::attr(class)").get().split()[-1]
+            ),
             "category": response.css(
                 "li:nth-last-of-type(2) > a::text"
             ).get(),
