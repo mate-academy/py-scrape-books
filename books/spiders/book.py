@@ -1,3 +1,6 @@
+from collections.abc import Generator
+from typing import Optional, Union
+
 import scrapy
 
 from scrapy.http import Response
@@ -8,7 +11,7 @@ class BookSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs) -> scrapy.Request:
+    def parse(self, response: Response, **kwargs: Optional[dict]) -> Generator[scrapy.Request, None, None]:
         book_links = response.css(".product_pod h3 a::attr(href)").extract()
         for book_link in book_links:
             yield scrapy.Request(
@@ -25,7 +28,7 @@ class BookSpider(scrapy.Spider):
         return ratings[rating_class[1]]
 
     @staticmethod
-    def extract_amount_in_stock(response: Response) -> int | str:
+    def extract_amount_in_stock(response: Response) -> Union[int, str]:
         availability_text = response.css(
             ".table-striped tr:nth-child(6) td::text"
         ).get()
@@ -35,7 +38,7 @@ class BookSpider(scrapy.Spider):
         else:
             return "Not available"
 
-    def parse_book(self, response: Response) -> dict:
+    def parse_book(self, response: Response) -> Generator[dict, None, None]:
         yield {
             "title": response.css("h1::text").get(),
             "price": response.css(".price_color::text").get().replace("£", ""),
