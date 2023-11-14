@@ -1,5 +1,7 @@
 import scrapy
 from scrapy.http import Response
+from collections.abc import Generator
+from typing import Optional, Union
 
 
 class BookSpider(scrapy.Spider):
@@ -7,7 +9,10 @@ class BookSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com//"]
 
-    def parse(self, response: Response, **kwargs) -> None:
+    def parse(self,
+              response: Response,
+              **kwargs: Optional[dict]
+              ) -> Generator[scrapy.Request, None, None]:
         books_links = (
             response.css(".product_pod > .image_container")
             .css("a::attr(href)")
@@ -23,14 +28,14 @@ class BookSpider(scrapy.Spider):
             yield scrapy.Request(next_page, callback=self.parse)
 
     @staticmethod
-    def book_rating(response: Response) -> int:
+    def book_rating(response: Response) -> Union[int, str]:
         star_ratings = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
 
         for string, integer in star_ratings.items():
             if response.css(f".product_main > p.{string}").get() is not None:
                 return integer
 
-    def parse_single_book(self, response: Response) -> dict:
+    def parse_single_book(self, response: Response) -> Generator[dict, None, None]:
         yield {
             "title": response.css(".product_main > h1::text").get(),
             "price": response.css(".price_color::text").get().replace("£", ""),
