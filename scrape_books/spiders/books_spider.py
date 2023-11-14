@@ -20,7 +20,7 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     @staticmethod
-    def parse_book_info(response: Response) -> Generator[dict, None, None]:
+    def parse_book_info(response: Response) -> Generator[dict[str, str], None, None]:
         yield {
             "title": response.css("h1::text").get(),
             "price": response.css(".price_color::text").get(),
