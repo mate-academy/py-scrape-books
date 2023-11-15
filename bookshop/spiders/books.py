@@ -1,13 +1,17 @@
+from typing import Generator
+
 import scrapy
 from scrapy.http import Response
 
 
 class BooksSpider(scrapy.Spider):
     name = "books"
-    allowed_domains = ["books.toscrape.com"]
-    start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs) -> None:
+    def start_requests(self) -> Generator[scrapy.Request, None, None]:
+        url = "https://books.toscrape.com/"
+        yield scrapy.Request(url=url, callback=self.parse)
+
+    def parse(self, response: Response, **kwargs) -> Generator[scrapy.Request, None, None]:
         for book in response.css(".product_pod"):
             yield scrapy.Request(
                 response.urljoin(book.css("a::attr(href)").get()),
@@ -18,7 +22,7 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     @staticmethod
-    def parse_detail(response: Response) -> dict:
+    def parse_detail(response: Response) -> dict[str, str | float | int]:
         return {
             "title": response.css(".product_main h1::text").get(),
             "price": float(
