@@ -3,7 +3,7 @@ import re
 import scrapy
 
 
-def parse_detail_page(response):
+def parse_detail_page(response: scrapy.http.Response) -> dict:
     amount_string = response.xpath(
         "//div/p[@class='instock availability']/text()"
     ).getall()
@@ -22,9 +22,7 @@ def parse_detail_page(response):
 
     yield {
         "title": response.xpath("//h1/text()").get(),
-        "price": response.xpath(
-            "//div/p[@class='price_color']/text()"
-        ).get(),
+        "price": response.xpath("//div/p[@class='price_color']/text()").get(),
         "amount_in_stock": amount,
         "rating": rating,
         "category": response.xpath(
@@ -42,14 +40,16 @@ def parse_detail_page(response):
 class QuotesSpider(scrapy.Spider):
     name = "books_catalogue"
 
-    def start_requests(self):
+    def start_requests(self) -> scrapy.Request:
         urls = [
             "https://books.toscrape.com/",
         ]
         for url in urls:
             yield scrapy.Request(url=url, callback=self.parse)
 
-    def parse(self, response, **kwargs):
+    def parse(
+        self, response: scrapy.http.Response, **kwargs
+    ) -> scrapy.Request:
         for book in response.xpath("//article[@class='product_pod']"):
             detail_page = book.xpath("./h3/a/@href").get()
             if detail_page is not None:
