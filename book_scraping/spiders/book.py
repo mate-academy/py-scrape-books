@@ -1,3 +1,5 @@
+from typing import Generator
+
 import scrapy
 from scrapy.http import Response
 
@@ -31,7 +33,7 @@ class BookSpider(scrapy.Spider):
             "upc": book.css('th:contains("UPC") + td::text').get(),
         }
 
-    def parse(self, response: Response, **kwargs) -> dict:
+    def parse(self, response: Response, **kwargs) -> Generator[scrapy.Request, None, None]:
         books_urls = response.css(".product_pod > h3 > a::attr(href)").getall()
 
         for url in books_urls:
