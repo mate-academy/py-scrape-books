@@ -1,3 +1,5 @@
+from typing import Generator
+
 import scrapy
 from scrapy.http.response import Response
 
@@ -5,7 +7,9 @@ from scrapy.http.response import Response
 class BooksSpider(scrapy.Spider):
     name = "books"
     allowed_domains = ["books.toscrape.com"]
-    start_urls = ["https://books.toscrape.com/"]
+    start_urls = [
+        "http://books.toscrape.com/",
+    ]
 
     def parse(self, response: Response, **kwargs: dict) -> None:
         for book in response.css(".product_pod"):
@@ -20,18 +24,20 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     @staticmethod
-    def parse_single_book(book_page: Response) -> dict[str, str]:
+    def parse_single_book(
+        book_page: Response,
+    ) -> Generator[dict[str, str], None, None]:
         detail_info = {
             "title": book_page.css(".product_main > h1::text").get(),
             "price": book_page.css(".price_color::text").get(),
-            "amount_in_stock": (
-                book_page.css("tr:nth-child(6) > td::text").get()
+            "amount_in_stock": int(
+                book_page.css("tr:nth-child(6) > td::text")
+                .get()
                 .replace("(", "")
                 .split(" ")[2]
             ),
             "rating": (
-                book_page.css("p.star-rating::attr(class)").get()
-                .split()[1]
+                book_page.css("p.star-rating::attr(class)").get().split()[1]
             ),
             "category": (
                 book_page.css(".breadcrumb > li:nth-child(3) a::text").get()
