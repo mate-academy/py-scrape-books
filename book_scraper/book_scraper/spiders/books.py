@@ -1,10 +1,12 @@
+from collections.abc import Generator
+from typing import Optional
+
 import scrapy
 from scrapy.http import Response
 
 
 class BooksSpider(scrapy.Spider):
     name = "books"
-    allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
     @staticmethod
@@ -13,7 +15,10 @@ class BooksSpider(scrapy.Spider):
         number_dict = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
         return number_dict.get(number_str, 0)
 
-    def parse(self, response: Response) -> str:
+    def parse(
+            self,
+            response: Response, **kwargs: Optional[dict]
+    ) -> Generator[scrapy.Request, None, None]:
         for book in response.css(".product_pod"):
             detail_page = response.urljoin(
                 book.css("h3 > a::attr(href)"
@@ -24,7 +29,10 @@ class BooksSpider(scrapy.Spider):
         if next_page:
             yield scrapy.Request(next_page, callback=self.parse)
 
-    def parse_book_detail(self, response: Response) -> dict:
+    def parse_book_detail(
+            self,
+            response: Response
+    ) -> Generator[dict, None, None]:
         yield {
             "title": response.css(".product_main > h1::text").get(),
             "price": float(response.css(
@@ -58,7 +66,7 @@ class BooksSpider(scrapy.Spider):
                 f"{i}.html", callback=self.parse
             )
 
-    def closed(self, reason: str) -> None:
+    def closed(self) -> None:
         self.log(f"Scraped "
                  f"{self.crawler.stats.get_value('item_scraped_count')} "
                  f"books.")
