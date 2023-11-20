@@ -1,11 +1,11 @@
+from typing import Generator
+
 import scrapy
 from scrapy.http import Response
 
 
 class BooksSpider(scrapy.Spider):
     name = "books"
-    allowed_domains = ["books.toscrape.com"]
-    start_urls = ["https://books.toscrape.com/"]
     rating = {
         "One": 1,
         "Two": 2,
@@ -14,7 +14,12 @@ class BooksSpider(scrapy.Spider):
         "Five": 5
     }
 
-    def parse_single_book(self, response: Response) -> dict:
+    def start_requests(self):
+        urls = ["https://books.toscrape.com/"]
+        for url in urls:
+            yield scrapy.Request(url=url, callback=self.parse)
+
+    def parse_single_book(self, response: Response) -> Generator[dict]:
         yield {
             "title": response.css(".product_main > h1::text").get(),
             "price": float(response.css(".price_color::text").get()[1:]),
@@ -36,6 +41,6 @@ class BooksSpider(scrapy.Spider):
             book_url = book.css(".image_container > a[href]::attr(href)").get()
             yield response.follow(book_url, callback=self.parse_single_book)
 
-        # next_page = response.css(".next > a[href]::attr(href)").get()
-        # if next_page is not None:
-        #     yield response.follow(next_page, callback=self.parse)
+        next_page = response.css(".next > a[href]::attr(href)").get()
+        if next_page is not None:
+            yield response.follow(next_page, callback=self.parse)
