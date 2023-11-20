@@ -1,3 +1,5 @@
+from typing import Generator, Any
+
 import scrapy
 from scrapy.http import Response
 from word2number import w2n
@@ -8,7 +10,7 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs):
+    def parse(self, response: Response, **kwargs) -> Generator[dict[Any]:
         for book in response.css(".product_pod"):
             detail_page = book.css("h3 a::attr(href)").get()
             yield response.follow(detail_page, callback=self.parse_book)
@@ -19,7 +21,7 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     @staticmethod
-    def parse_book(response: Response):
+    def parse_book(response: Response) -> Generator[dict[Any]:
         title = response.css("h1::text").get()
         price = float(
             response.css("p.price_color::text").get().replace("£", "")
