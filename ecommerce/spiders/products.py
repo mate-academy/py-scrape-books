@@ -34,17 +34,21 @@ class ProductsSpider(scrapy.Spider):
             .split(" ")[14]
             .replace("(", "")
         )
+
+        rating_mapping = {
+            "One": 1,
+            "Two": 2,
+            "Three": 3,
+            "Four": 4,
+            "Five": 5,
+        }
+
         rating = 0
-        if product_main.css("p.One"):
-            rating = 1
-        elif product_main.css("p.Two"):
-            rating = 2
-        elif product_main.css("p.Three"):
-            rating = 3
-        elif product_main.css("p.Four"):
-            rating = 4
-        elif product_main.css("p.Five"):
-            rating = 5
+
+        for class_name in rating_mapping:
+            if product_main.css(f"p.{class_name}"):
+                rating = rating_mapping[class_name]
+                break
 
         category = response.css(".breadcrumb a::text").getall()[2]
         description = response.css(".product_page p::text").getall()[10]
