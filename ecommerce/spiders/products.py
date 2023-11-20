@@ -1,3 +1,5 @@
+from typing import Generator, Dict
+
 import scrapy
 from scrapy.http import Response
 
@@ -7,7 +9,7 @@ class ProductsSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com"]
 
-    def parse(self, response: Response, **kwargs) -> None:
+    def parse(self, response: Response, **kwargs) -> Generator[Dict[str, str], None, None]:
         image_containers = response.css("div.image_container")
 
         for container in image_containers:
@@ -24,7 +26,7 @@ class ProductsSpider(scrapy.Spider):
             yield scrapy.Request(next_page_url, callback=self.parse)
 
     @staticmethod
-    def parse_page(response: Response) -> dict:
+    def parse_page(response: Response) -> Generator[Dict[str, str], None, None]:
         product_main = response.css("div.product_main")
         title = product_main.css("h1::text").get()
         price = float(product_main.css("p.price_color::text").get().replace("£", ""))
