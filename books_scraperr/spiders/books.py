@@ -12,7 +12,7 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs) -> Generator[callable]:
+    def parse(self, response: Response, **kwargs) -> Generator[callable, None, None]:
         books = response.css(".product_pod")
         for book in books:
             yield scrapy.Request(
