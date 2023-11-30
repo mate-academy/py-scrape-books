@@ -15,10 +15,10 @@ class BooksSpider(scrapy.Spider):
                 callback=self.get_single_book,
             )
 
-            next_page = response.css(".next > a::attr(href)").get()
+        next_page = response.css(".next > a::attr(href)").get()
 
-            if next_page is not None:
-                yield response.follow(next_page, callback=self.parse)
+        if next_page is not None:
+            yield response.follow(next_page, callback=self.parse)
 
     def get_single_book(self, response: Response) -> dict:
         yield {
