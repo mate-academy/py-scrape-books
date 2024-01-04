@@ -7,7 +7,6 @@ class BookSpider(scrapy.Spider):
     start_urls = ["https://books.toscrape.com/"]
 
     def parse(self, response: Response, **kwargs) -> Response:
-
         for book in response.css(".product_pod"):
             book_link = book.css("h3 a::attr(href)").get()
             book_link = response.urljoin(book_link)
@@ -21,11 +20,11 @@ class BookSpider(scrapy.Spider):
 
     def parse_book(self, response: Response) -> dict:
         yield {
-            'title': response.css("h1::text").get(),
-            'price': response.css(".price_color::text").get(),
-            'amount_in_stock': response.css(".instock").get().split()[7][1:],
-            'rating': response.css(".star-rating::attr(class)").get(),
-            'category': response.css(".breadcrumb li a::text").getall(),
-            'description': response.css(".product_page > p::text").get(),
-            'upc': response.css(".table tr td::text").get()
+            "title": response.css("h1::text").get(),
+            "price": response.css(".price_color::text").get(),
+            "amount_in_stock": response.css(".instock").get().split()[7][1:],
+            "rating": response.css(".star-rating::attr(class)").get(),
+            "category": response.css(".breadcrumb li a::text").getall(),
+            "description": response.css(".product_page > p::text").get(),
+            "upc": response.css(".table tr td::text").get(),
         }
