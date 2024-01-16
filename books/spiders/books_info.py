@@ -1,4 +1,4 @@
-from typing import Iterator
+from typing import Generator
 
 import scrapy
 
@@ -8,7 +8,7 @@ class BooksInfoSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response, **kwargs) -> Iterator[scrapy.Request]:
+    def parse(self, response, **kwargs) -> Generator[scrapy.Request]:
         for book in response.css(".product_pod"):
             detail_url = response.urljoin(book.css("h3 > a::attr(href)").get())
             yield scrapy.Request(
