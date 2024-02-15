@@ -13,9 +13,9 @@ class SpyderBooksSpider(scrapy.Spider):
     def parse(self, response: Response, **kwargs):
         for url in response.css(".product_pod > h3 > a::attr(href)").getall():
             yield response.follow(url=url, callback=self.parse_one_book_details)
-
-
-
+        next_page = response.css(".next a::attr(href)").get()
+        if next_page is not None:
+            yield response.follow(next_page, callback=self.parse)
 
     def parse_one_book_details(self, response: Response, **kwargs):
         p_element = response.css('p.instock.availability')
