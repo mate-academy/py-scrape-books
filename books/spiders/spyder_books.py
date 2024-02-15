@@ -8,9 +8,16 @@ from scrapy.http import Response
 class SpyderBooksSpider(scrapy.Spider):
     name = "spyder_books"
     allowed_domains = ["books.toscrape.com"]
-    start_urls = ["https://books.toscrape.com/catalogue/unicorn-tracks_951/index.html"]
+    start_urls = ["https://books.toscrape.com/catalogue/category/books/fantasy_19/index.html"]
 
     def parse(self, response: Response, **kwargs):
+        for url in response.css(".product_pod > h3 > a::attr(href)").getall():
+            yield response.follow(url=url, callback=self.parse_one_book_details)
+
+
+
+
+    def parse_one_book_details(self, response: Response, **kwargs):
         p_element = response.css('p.instock.availability')
         p_html = p_element.get()
         match = re.search(r'(\d+) available', p_html)
