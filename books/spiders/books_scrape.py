@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import scrapy
+from cssselect.parser import Element
 from scrapy import Selector
 from scrapy.http import Response
 from selenium import webdriver
@@ -27,14 +28,14 @@ class BooksScrapeSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.driver = webdriver.Chrome()
 
     def close(self, reason: str) -> None:
         self.driver.close()
 
-    def parse(self, response: Response, **kwargs):
+    def parse(self, response: Response, **kwargs) -> Response:
         books = response.css("article.product_pod")
         for book in books:
             yield self._parse_book_detail(response, book)
@@ -43,7 +44,7 @@ class BooksScrapeSpider(scrapy.Spider):
         if next_page is not None:
             yield response.follow(next_page, callback=self.parse)
 
-    def _parse_book_detail(self, response: Response, book: Selector):
+    def _parse_book_detail(self, response: Response, book: Selector) -> dict:
         detail_url = response.urljoin(book.css("a::attr(href)").get())
         self.driver.get(detail_url)
 
