@@ -1,5 +1,4 @@
 from typing import Any
-from urllib.parse import urljoin
 
 import scrapy
 from scrapy.http import Response
@@ -10,12 +9,10 @@ RATING_INTERFACE = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
 class BookSpider(scrapy.Spider):
     name = "books"
     start_urls = ["https://books.toscrape.com/"]
-    BASE_DETAIL_URL = "https://books.toscrape.com/"
 
-    # product_pod
     def parse(self, response: Response, **kwargs: Any) -> Any:
         books_url = [
-            urljoin(self.BASE_DETAIL_URL, book_href)
+            response.urljoin(book_href)
             for book_href in response.css(
                 ".product_pod > .image_container > a::attr(href)"
             ).extract()
@@ -23,6 +20,11 @@ class BookSpider(scrapy.Spider):
 
         for book_url in books_url:
             yield scrapy.Request(url=book_url, callback=self.parse_single_product)
+
+        next_page = response.css(".pager > .next > a::attr(href)").get()
+        if next_page:
+            next_page_url = response.urljoin(next_page)
+            yield scrapy.Request(url=next_page_url, callback=self.parse)
 
     def parse_single_product(self, response: Response) -> dict[str, [str, int, float]]:
         title = response.css(".product_main > h1::text").get()
