@@ -18,14 +18,11 @@ class BooksSpider(scrapy.Spider):
             next_page_url = response.urljoin(next_page_link)
             yield response.follow(next_page_url, callback=self.parse)
 
-    @staticmethod
-    def extract_stock_amount(string: str) -> int:
+    def extract_stock_amount(self, string: str) -> int:
         digits = "".join(filter(str.isdigit, string.strip()))
-
         return int(digits)
 
-    @staticmethod
-    def extract_rating(string: str) -> int:
+    def extract_rating(self, string: str) -> int:
         rating_map = {
             "One": 1,
             "Two": 2,
@@ -33,7 +30,6 @@ class BooksSpider(scrapy.Spider):
             "Four": 4,
             "Five": 5,
         }
-
         return rating_map[string.split()[-1]]
 
     def parse_book(self, response: Response) -> dict:
