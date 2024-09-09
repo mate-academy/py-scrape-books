@@ -1,5 +1,6 @@
 import scrapy
 from scrapy.http import Response
+from typing import Generator
 
 
 class Scrape(scrapy.Spider):
@@ -9,7 +10,7 @@ class Scrape(scrapy.Spider):
         "https://books.toscrape.com/catalogue/category/books_1/index.html"
     ]
 
-    def parse(self, response: Response) -> None:
+    def parse(self, response: Response) -> Generator[scrapy.Request, None, None]:
         book_links = response.css('h3 a::attr(href)').extract()
         for link in book_links:
             yield response.follow(link, callback=self.parse_book)
@@ -18,14 +19,14 @@ class Scrape(scrapy.Spider):
         if next_page:
             yield response.follow(next_page, callback=self.parse)
 
-    def parse_book(self, response: Response) -> dict:
-        title = response.css('h1::text').get()
-        price = response.css('.price_color::text').get(default='').lstrip('£')
-        stock = response.css('p.availability::text').re_first(r'\d+', default='0')
-        rating = response.css('.star-rating::attr(class)').get().split()[-1]
-        category = response.css('.breadcrumb li a::text').getall()[-1]
-        description = response.css('meta[name="description"]::attr(content)').get()
-        upc = response.css('tr:nth-child(1) td::text').get()
+    def parse_book(self, response: Response) -> Generator[dict, None, None]:
+        title: str = response.css('h1::text').get()
+        price: str = response.css('.price_color::text').get(default='').lstrip('£')
+        stock: str = response.css('p.availability::text').re_first(r'\d+', default='0')
+        rating: str = response.css('.star-rating::attr(class)').get().split()[-1]
+        category: str = response.css('.breadcrumb li a::text').getall()[-1]
+        description: str = response.css('meta[name="description"]::attr(content)').get()
+        upc: str = response.css('tr:nth-child(1) td::text').get()
 
         yield {
             'title': title,
