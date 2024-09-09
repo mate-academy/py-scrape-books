@@ -26,12 +26,16 @@ class BooksSpider(scrapy.Spider):
     def close(self, reason: any) -> None:
         self.driver.close()
 
-    def parse(self, response: Response, **kwargs: Any) -> Generator[scrapy.Request, None, None]:
+    def parse(
+            self, response: Response, **kwargs: Any
+    ) -> Generator[scrapy.Request, None, None]:
         for book in response.css(".product_pod"):
             detail_url = book.css("h3 > a::attr(href)").get()
             yield response.follow(detail_url, callback=self.parse_book_info)
 
-    def parse_book_info(self, response: Response) -> Generator[BooksItem]:
+    def parse_book_info(
+            self, response: Response
+    ) -> Generator[BooksItem]:
         yield {
             "title": response.css(
                 ".product_main > h1::text"
