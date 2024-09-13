@@ -43,10 +43,3 @@ class BookSpider(scrapy.Spider):
             "description": soup.select_one("#product_description + p").text if soup.select_one("#product_description + p") else None,
             "upc": soup.select_one(".table.table-striped").select_one("tr > td").text
         }
-
-# price
-# amount_in_stock
-# rating
-# category
-# description
-# upc
