@@ -6,3 +6,6 @@
 venv/
 .pytest_cache/
 **__pycache__/
+books.csv
+books.jl
+book_parse.html
