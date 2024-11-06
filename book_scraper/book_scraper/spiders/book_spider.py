@@ -3,7 +3,7 @@ from scrapy.http import Response, Request
 from typing import Generator
 
 
-class BookSpyder(scrapy.Spider):
+class BookSpider(scrapy.Spider):
     name = "books"
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
