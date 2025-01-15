@@ -7,12 +7,11 @@ from dataclasses import dataclass
 import scrapy
 
 
-@dataclass
 class BooksItem(scrapy.Item):
-    title: str=None
-    price: float=None
-    amount_in_stock: int=None
-    rating: int=None
-    category: str=None
-    description: str=None
-    upc: str=None
+    title = scrapy.Field()
+    price = scrapy.Field()
+    amount_in_stock = scrapy.Field()
+    rating = scrapy.Field()
+    category = scrapy.Field()
+    description = scrapy.Field()
+    upc = scrapy.Field()
