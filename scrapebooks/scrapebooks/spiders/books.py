@@ -1,7 +1,7 @@
 import scrapy
 from scrapy.http import Response
 
-from ..items import BookItem
+from scrapebooks.items import BookItem
 
 
 class BooksSpider(scrapy.Spider):
