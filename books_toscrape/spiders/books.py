@@ -1,5 +1,6 @@
-import scrapy
+from typing import Generator
 
+import scrapy
 from scrapy.http import Response
 from word2number.w2n import word_to_num
 
@@ -11,11 +12,13 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs):
+    def parse(self, response: Response, **kwargs) -> Generator:
         book_links = response.css("a[title]")
 
         for book_link in book_links:
-            yield response.follow(book_link, callback=self.parse_detail_book_page)
+            yield response.follow(
+                book_link, callback=self.parse_detail_book_page
+            )
 
         next_page = response.css("li.next a::attr(href)").get()
 
@@ -24,17 +27,33 @@ class BooksSpider(scrapy.Spider):
 
     def parse_detail_book_page(self, response: Response) -> BooksToscrapeItem:
         yield BooksToscrapeItem(
-            title=response.css(".product_main h1::text").get(),
+            title=response.css(
+                ".product_main h1::text"
+            ).get(),
             price=float(
-                response.css(".product_main .price_color::text").get().replace("£", "")
+                response.css(
+                    ".product_main .price_color::text"
+                ).get().replace("£", "")
             ),
             amount_in_stock=int(
-                response.css("p.instock.availability::text").getall()[1].strip().split("(")[1].split()[0]
+                response.css("p.instock.availability::text")
+                .getall()[1]
+                .strip()
+                .split("(")[1]
+                .split()[0]
             ),
             rating=word_to_num(
-                response.css(".product_main .star-rating::attr(class)").get().split()[-1]
+                response.css(".product_main .star-rating::attr(class)")
+                .get()
+                .split()[-1]
             ),
-            category=response.css("ul.breadcrumb li:nth-child(3) a::text").get(),
-            description=response.css("#product_description + p::text").get(),
-            upc=response.css("table.table-striped tr:nth-child(1) td::text").get()
+            category=response.css(
+                "ul.breadcrumb li:nth-child(3) a::text"
+            ).get(),
+            description=response.css(
+                "#product_description + p::text"
+            ).get(),
+            upc=response.css(
+                "table.table-striped tr:nth-child(1) td::text"
+            ).get(),
         )
