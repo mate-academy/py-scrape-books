@@ -1,6 +1,7 @@
 import scrapy
 from scrapy.http import Response
-
+from typing import List, Dict, Optional
+from book_lib.items import BookLibItem  # Подключаем Item для книги
 
 class BooksSpider(scrapy.Spider):
     name = "books"
@@ -8,7 +9,7 @@ class BooksSpider(scrapy.Spider):
     start_urls = ["https://books.toscrape.com/"]
 
     def get_rating(self, book: scrapy.Selector) -> int:
-        """ Check book rating and give int"""
+        """Check book rating and return it as an integer."""
         rating_class = book.css(".star-rating::attr(class)").get()
         if rating_class:
             rating_class = rating_class.split()[-1]
@@ -39,31 +40,26 @@ class BooksSpider(scrapy.Spider):
             next_page_url = response.urljoin(next_page)
             yield scrapy.Request(url=next_page_url, callback=self.parse)
 
-    def parse_book_page(self, response: Response) -> dict:
-        """We parse the pages of the book and
-        extract the necessary information"""
+    def parse_book_page(self, response: Response) -> Dict[str, Optional[str]]:
+        """Parse the book page and extract the necessary information."""
+        item = BookLibItem()  # Создаём экземпляр Item для книги
 
-        title = response.css("h1::text").get()
-        price = float(
+        item["title"] = response.css("h1::text").get()
+        item["price"] = float(
             response.css(".price_color::text").get().replace("£", "")
         )
-        upc = response.css("th:contains('UPC') + td::text").get()
-        stock = response.css(
-            "th:contains('Availability') + td::text"
-        ).get()
-        description = response.css(
+        item["upc"] = response.css("th:contains('UPC') + td::text").get()
+        stock = response.css("th:contains('Availability') + td::text").get()
+        item["description"] = response.css(
             "meta[name='description']::attr(content)"
         ).get()
 
         if stock:
-            stock = int(stock.split(" ")[-2][1:])
+            item["availability"] = int(stock.split(" ")[-2][1:])
         else:
-            stock = 0
+            item["availability"] = 0
 
-        yield {
-            "title": title,
-            "price": price,
-            "upc": upc,
-            "availability": stock,
-            "description": description
-        }
+        # Дополнительно можно добавить рейтинг
+        item["rating"] = self.get_rating(response)
+
+        yield item
