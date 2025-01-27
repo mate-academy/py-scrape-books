@@ -8,6 +8,21 @@
 from itemadapter import ItemAdapter
 
 
+import json
+
+from books.items import Book
+
+
 class BooksPipeline:
+    def __init__(self):
+        self.file = open('books.jl', 'w', encoding='utf-8')
+
     def process_item(self, item, spider):
+        if isinstance(item, Book):
+            json.dump(item.__dict__, self.file, ensure_ascii=False)
+            self.file.write('\n')
+
         return item
+
+    def close_spider(self, spider):
+        self.file.close()

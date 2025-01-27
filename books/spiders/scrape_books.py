@@ -42,7 +42,7 @@ class ScrapeBooksSpider(scrapy.Spider):
             price = float(content.css(".price_color::text").get().replace("£", ""))
 
             rating_class = content.css(".star-rating::attr(class)").get()
-            rating = RATING_NUMS[rating_class.split(" ")[-1]]
+            rating = RATING_NUMS.get(rating_class.split(" ")[-1])
 
             book = Book(
                 title=title,
