@@ -16,6 +16,12 @@ class ProductsSpider(scrapy.Spider):
 
             yield response.follow(book_url, callback=self.parse_book)
 
+        next_page = response.css("li.next a::attr(href)").get()
+        if next_page is not None:
+            # yield response.follow(response.urljoin(next_page), callback=self.parse)
+            next_page_url = response.urljoin(next_page)
+            yield scrapy.Request(next_page_url, callback=self.parse)
+
     def parse_book(self, response: Response):
         """Parse the exact book`s page in order to get all details"""
 
