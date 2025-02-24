@@ -1,13 +1,16 @@
-# Define your item pipelines here
-#
-# Don't forget to add your pipeline to the ITEM_PIPELINES setting
-# See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
+import json
+from scrapy import Item
+from scrapy.spiders import Spider
 
 
-# useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
+class JsonLinesPipeline:
+    def open_spider(self, spider: Spider) -> None:
+        self.file = open("books.jl", "w", encoding="utf-8")
 
-
-class ScrapybooksPipeline:
-    def process_item(self, item, spider):
+    def process_item(self, item: Item, spider: Spider) -> Item:
+        line = json.dumps(dict(item), ensure_ascii=False) + "\n"
+        self.file.write(line)
         return item
+
+    def close_spider(self, spider: Spider) -> None:
+        self.file.close()

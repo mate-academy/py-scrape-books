@@ -1,5 +1,6 @@
 import scrapy
 from scrapy.http import Response
+from scrapybooks.items import ScrapybooksItem
 
 
 class MySpiderSpider(scrapy.Spider):
@@ -17,16 +18,18 @@ class MySpiderSpider(scrapy.Spider):
             yield response.follow(response.urljoin(next_page), callback=self.parse)
 
     def parse_book(self, response: Response) -> dict:
-        yield {
-            "title": response.css("h1::text").get(),
-            "price": float(response.css("p.price_color::text").get().replace("£", "")),
-            "amount_in_stock": int(
-                response.css("p.instock.availability::text").re_first(r"\d+")
-            ),
-            "rating": response.css("p.star-rating").attrib["class"].split()[-1],
-            "category": response.css("ul.breadcrumb li:nth-child(3) a::text").get(),
-            "description": response.css("meta[name='description']::attr(content)")
-            .get()
-            .strip(),
-            "upc": response.css("table tr:nth-child(1) td::text").get(),
-        }
+        item = ScrapybooksItem()
+        item["title"] = response.css("h1::text").get()
+        item["price"] = float(
+            response.css("p.price_color::text").get().replace("£", "")
+        )
+        item["amount_in_stock"] = int(
+            response.css("p.instock.availability::text").re_first(r"\d+")
+        )
+        item["rating"] = response.css("p.star-rating").attrib["class"].split()[-1]
+        item["category"] = response.css("ul.breadcrumb li:nth-child(3) a::text").get()
+        item["description"] = (
+            response.css("meta[name='description']::attr(content)").get().strip()
+        )
+        item["upc"] = response.css("table tr:nth-child(1) td::text").get()
+        yield item
