@@ -9,5 +9,13 @@ from itemadapter import ItemAdapter
 
 
 class BooksPipeline:
+    def open_spider(self, spider):
+        self.file = open("books.jl", "w", encoding="utf-8")
+
+    def close_spider(self, spider):
+        self.file.close()
+
     def process_item(self, item, spider):
+        line = f"{dict(item)}\n"
+        self.file.write(line)
         return item
