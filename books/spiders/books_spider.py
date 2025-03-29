@@ -1,3 +1,5 @@
+from urllib.parse import urljoin
+
 import scrapy
 from scrapy import Selector
 from scrapy.http import Response
@@ -9,6 +11,7 @@ from selenium.webdriver.remote.webelement import WebElement
 
 class BooksSpider(scrapy.Spider):
     name = "books"
+    allowed_domains = ["https://books.toscrape.com/"]
     start_urls = ["https://books.toscrape.com/"]
 
     def __init__(self, *args, **kwargs) -> None:
@@ -23,7 +26,6 @@ class BooksSpider(scrapy.Spider):
     def parse(self, response: Response, **kwargs) -> dict:
         for product in response.css(".row > li"):
             page_product = self.parse_page_product(
-                response=response,
                 product=product
             )
             result = {
@@ -36,9 +38,9 @@ class BooksSpider(scrapy.Spider):
 
             yield result
 
-        next_url_page = response.css(".next > a::attr(href)").get()
-        if next_url_page is not None:
-            yield response.follow(next_url_page, callback=self.parse)
+        # next_url_page = response.css(".next > a::attr(href)").get()
+        # if next_url_page is not None:
+        #     yield response.follow(next_url_page, callback=self.parse)
 
     def get_elem_or_false(self, by: By, value: str) -> WebElement | bool:
         try:
@@ -49,10 +51,9 @@ class BooksSpider(scrapy.Spider):
 
     def parse_page_product(
             self,
-            response: Response,
             product: Selector
     ) -> dict:
-        absolute_url = response.urljoin(
+        absolute_url = urljoin(self.allowed_domains[0],
             product.css("h3 > a::attr(href)").get()
         )
         rating_dict = {
