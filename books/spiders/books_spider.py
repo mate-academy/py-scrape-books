@@ -38,9 +38,9 @@ class BooksSpider(scrapy.Spider):
 
             yield result
 
-        # next_url_page = response.css(".next > a::attr(href)").get()
-        # if next_url_page is not None:
-        #     yield response.follow(next_url_page, callback=self.parse)
+        next_url_page = response.css(".next > a::attr(href)").get()
+        if next_url_page is not None:
+            yield response.follow(next_url_page, callback=self.parse)
 
     def get_elem_or_false(self, by: By, value: str) -> WebElement | bool:
         try:
