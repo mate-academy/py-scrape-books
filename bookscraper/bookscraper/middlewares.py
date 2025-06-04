@@ -1,100 +1,84 @@
-# Define here the models for your spider middleware
-#
-# See documentation in:
-# https://docs.scrapy.org/en/latest/topics/spider-middleware.html
-
+from typing import Any, AsyncIterator, Iterable, Optional, Union
 from scrapy import signals
-
-# useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
+from scrapy.http import Request, Response
+from scrapy.crawler import Crawler
+from scrapy.spiders import Spider
 
 
 class BookscraperSpiderMiddleware:
-    # Not all methods need to be defined. If a method is not defined,
-    # scrapy acts as if the spider middleware does not modify the
-    # passed objects.
-
     @classmethod
-    def from_crawler(cls, crawler):
-        # This method is used by Scrapy to create your spiders.
-        s = cls()
-        crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
-        return s
+    def from_crawler(cls, crawler: Crawler) -> "BookscraperSpiderMiddleware":
+        middleware_instance = cls()
+        crawler.signals.connect(
+            middleware_instance.spider_opened,
+            signal=signals.spider_opened
+        )
+        return middleware_instance
 
-    def process_spider_input(self, response, spider):
-        # Called for each response that goes through the spider
-        # middleware and into the spider.
-
-        # Should return None or raise an exception.
+    def process_spider_input(
+            self, response: Response, spider: Spider
+    ) -> Optional[None]:
         return None
 
-    def process_spider_output(self, response, result, spider):
-        # Called with the results returned from the Spider, after
-        # it has processed the response.
+    def process_spider_output(
+        self,
+        response: Response,
+        result: Iterable[Union[Request, Any]],
+        spider: Spider,
+    ) -> Iterable[Union[Request, Any]]:
+        for item in result:
+            yield item
 
-        # Must return an iterable of Request, or item objects.
-        for i in result:
-            yield i
+    def process_spider_exception(
+        self,
+        response: Response,
+        exception: Exception,
+        spider: Spider,
+    ) -> Optional[Iterable[Union[Request, Any]]]:
+        return None
 
-    def process_spider_exception(self, response, exception, spider):
-        # Called when a spider or process_spider_input() method
-        # (from other spider middleware) raises an exception.
-
-        # Should return either None or an iterable of Request or item objects.
-        pass
-
-    async def process_start(self, start):
-        # Called with an async iterator over the spider start() method or the
-        # maching method of an earlier spider middleware.
+    async def process_start(
+            self, start: AsyncIterator[Union[Request, Any]]
+    ) -> AsyncIterator[Union[Request, Any]]:
         async for item_or_request in start:
             yield item_or_request
 
-    def spider_opened(self, spider):
-        spider.logger.info("Spider opened: %s" % spider.name)
+    def spider_opened(self, spider: Spider) -> None:
+        spider.logger.info("Spider opened: %s", spider.name)
 
 
 class BookscraperDownloaderMiddleware:
-    # Not all methods need to be defined. If a method is not defined,
-    # scrapy acts as if the downloader middleware does not modify the
-    # passed objects.
-
     @classmethod
-    def from_crawler(cls, crawler):
-        # This method is used by Scrapy to create your spiders.
-        s = cls()
-        crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
-        return s
+    def from_crawler(
+            cls, crawler: Crawler
+    ) -> "BookscraperDownloaderMiddleware":
+        middleware_instance = cls()
+        crawler.signals.connect(
+            middleware_instance.spider_opened,
+            signal=signals.spider_opened
+        )
+        return middleware_instance
 
-    def process_request(self, request, spider):
-        # Called for each request that goes through the downloader
-        # middleware.
-
-        # Must either:
-        # - return None: continue processing this request
-        # - or return a Response object
-        # - or return a Request object
-        # - or raise IgnoreRequest: process_exception() methods of
-        #   installed downloader middleware will be called
+    def process_request(
+            self, request: Request, spider: Spider
+    ) -> Optional[Union[Request, Response]]:
         return None
 
-    def process_response(self, request, response, spider):
-        # Called with the response returned from the downloader.
-
-        # Must either;
-        # - return a Response object
-        # - return a Request object
-        # - or raise IgnoreRequest
+    def process_response(
+        self,
+        request: Request,
+        response: Response,
+        spider: Spider,
+    ) -> Union[Response, Request]:
         return response
 
-    def process_exception(self, request, exception, spider):
-        # Called when a download handler or a process_request()
-        # (from other downloader middleware) raises an exception.
+    def process_exception(
+        self,
+        request: Request,
+        exception: Exception,
+        spider: Spider,
+    ) -> Optional[Union[Response, Request]]:
+        return None
 
-        # Must either:
-        # - return None: continue processing this exception
-        # - return a Response object: stops process_exception() chain
-        # - return a Request object: stops process_exception() chain
-        pass
-
-    def spider_opened(self, spider):
-        spider.logger.info("Spider opened: %s" % spider.name)
+    def spider_opened(self, spider: Spider) -> None:
+        spider.logger.info("Spider opened: %s", spider.name)
