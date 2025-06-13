@@ -1,0 +1,2 @@
+{"title": "A Light in the Attic", "price": "51.77", "amount_in_stock": "22", "rating": 3, "category": "Poetry", "description": "It's hard to imagine a world without A Light in the Attic.", "upc": "a897fe39b1053632"}
+{"title": "Tipping the Velvet", "price": "53.74", "amount_in_stock": "20", "rating": 1, "category": "Historical Fiction", "description": "A wonderful debut novel.", "upc": "90fa61229261140a"}
