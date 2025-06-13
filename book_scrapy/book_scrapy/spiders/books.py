@@ -5,7 +5,7 @@ from typing import Generator
 
 from scrapy.http import Response
 
-from book_scrapy.book_scrapy.items import ParseBooksItem
+from book_scrapy.items import ParseBooksItem
 
 
 class BooksSpider(scrapy.Spider):
