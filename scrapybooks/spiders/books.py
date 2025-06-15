@@ -1,5 +1,9 @@
+from typing import Any
+
 import scrapy
 from scrapy.http import Response
+
+from scrapybooks.items import ScrapybooksItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -7,7 +11,7 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def book_detail(self, response: Response) -> dict:
+    def book_detail(self, response: Response) -> ScrapybooksItem | Any | None:
         title = response.css(".product_main h1::text").get()
         price = response.css(".price_color::text").get().replace("£", "")
         availability_raw = response.css(".instock.availability::text").getall()
@@ -39,15 +43,15 @@ class BooksSpider(scrapy.Spider):
             ".table.table-striped tr:nth-child(1) td::text"
         ).get()
 
-        yield {
-            "title": title,
-            "price": float(price),
-            "amount in stock": amount_in_stock,
-            "rating": rating,
-            "category": category,
-            "description": description,
-            "upc": upc,
-        }
+        yield ScrapybooksItem(
+            title=title,
+            price=float(price),
+            amount_in_stock=amount_in_stock,
+            rating=rating,
+            category=category,
+            description=description,
+            upc=upc
+        )
 
     def parse(self, response: Response, **kwargs) -> None:
         for book in response.css(".product_pod"):
