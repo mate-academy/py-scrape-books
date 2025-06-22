@@ -1,12 +1,16 @@
 import logging
 import sys
+import scrapy
+
+from scrapy.http import Response
+from scrapy.selector import Selector
 
 from enum import Enum
 from urllib.parse import urljoin
-import scrapy
-from scrapy.http import Response
-from scrapy.selector import Selector
+
 from selenium import webdriver
+
+from bookstoscrape.items import BookstoscrapeItem
 
 
 logging.basicConfig(
@@ -21,6 +25,7 @@ logging.basicConfig(
 
 
 class RatingEnum(Enum):
+    Zero = 0
     One = 1
     Two = 2
     Three = 3
@@ -45,7 +50,7 @@ class BooksSpider(scrapy.Spider):
                 pass
 
     def parse(self, response: Response, **kwargs):
-        switch_page = urljoin(self.start_urls[0], "catalogue/")
+        base_book_url = urljoin(self.start_urls[0], "catalogue/")
 
         for book in response.css(".product_pod"):
             book_link = book.css("a[title]").attrib["href"]
@@ -55,27 +60,26 @@ class BooksSpider(scrapy.Spider):
             if book_link.split("/")[0] != "catalogue":
                 book_link = f"catalogue/{book_link}"
                 logging.info(f"book_link was changed: {book_link}")
-            # find on book page:  amount_in_stock, category,  description, upc
+
+            # find on specific book page:  amount_in_stock, category,  description, upc
             amount_in_stock, category, description, upc = (
                 self._parse_one_book_page(book_link)
             )
 
-            yield {
-                "title": book.css("a[title]").attrib["title"],
-                "price": float(
+            yield BookstoscrapeItem(
+                title=book.css("a[title]").attrib["title"],
+                price=float(
                     book.css("p.price_color::text").get().replace("£", "")
                 ),
-                "amount_in_stock": amount_in_stock,
-                "rating": RatingEnum[book.css(
-                    ".star-rating::attr(class)"
-                ).get().split()[1]].value,
-                "category": category,
-                "upc": upc,
-                "description": description
-            }
+                amount_in_stock=amount_in_stock,
+                rating=self._rating(book),
+                category=category,
+                upc=upc,
+                description=description
+            )
         try:
             next_page = urljoin(
-                switch_page, response.css(
+                base_book_url, response.css(
                     "li.next a::attr(href)"
                 ).get().split("/")[-1]
             )
@@ -83,7 +87,7 @@ class BooksSpider(scrapy.Spider):
 
             yield response.follow(next_page, callback=self.parse)
         except AttributeError:
-            logging.info("Scrapping finished...")
+            logging.info("Scrapping finished...") 
 
     def _parse_one_book_page(
             self, book_link: str
@@ -107,9 +111,15 @@ class BooksSpider(scrapy.Spider):
                 "p.instock.availability::text"
             ).getall()[1].split("(")[1].split()[0]
         )
-        category = selector.css(
-            "ul.breadcrumb li"
-        ).getall()[-2].split(">")[-3].split("<")[0]
+        category = selector.css("ul.breadcrumb li a::text").getall()[2]
         upc = selector.css("table.table-striped td::text").get()
 
         return (amount_in_stock, category, description, upc)
+    
+    def _rating(book: Selector) -> int:
+        try:
+            rating_str = book.css(".star-rating::attr(class)").get().split()[1]
+            rating = RatingEnum[rating_str].value
+        except (AttributeError, IndexError, KeyError):
+            rating = RatingEnum.Zero.value
+         
