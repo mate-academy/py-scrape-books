@@ -116,10 +116,10 @@ class BooksSpider(scrapy.Spider):
 
         return (amount_in_stock, category, description, upc)
     
-    def _rating(book: Selector) -> int:
+    def _rating(self, book: Selector) -> int:
         try:
             rating_str = book.css(".star-rating::attr(class)").get().split()[1]
-            rating = RatingEnum[rating_str].value
+            return RatingEnum[rating_str].value
         except (AttributeError, IndexError, KeyError):
-            rating = RatingEnum.Zero.value
+            return RatingEnum.Zero.value
          
