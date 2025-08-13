@@ -1,16 +1,7 @@
 import scrapy
 from scrapy.http import Response
-from typing import Any, Generator, Optional, TypedDict
-
-
-class Book(TypedDict, total=False):
-    title: Optional[str]
-    price: Optional[str]
-    amount_in_stock: Optional[str]
-    rating: Optional[str]
-    category: Optional[str]
-    description: Optional[str]
-    upc: Optional[str]
+from typing import Any, Generator, Optional
+from ecommerce.items import EcommerceItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -24,7 +15,7 @@ class BooksSpider(scrapy.Spider):
         }
     }
 
-    def parse(  # noqa: D401
+    def parse(  # noqa: D401, ARG002
         self, response: Response, **_: Any
     ) -> Generator[Any, None, None]:
         for link in response.css(
@@ -35,15 +26,24 @@ class BooksSpider(scrapy.Spider):
         if next_page:
             yield response.follow(next_page, callback=self.parse)
 
-    def parse_book(  # noqa: D401, PLR6201
+    def parse_book(  # noqa: D401, PLR6201, ARG002
         self, response: Response, **_: Any
-    ) -> Generator[Book, None, None]:
+    ) -> Generator[EcommerceItem, None, None]:
         self.logger.debug("Parsing book page: %s", response.url)
 
-        def extract_rating() -> Optional[str]:
-            rating_class = response.css(
-                "p.star-rating::attr(class)").get()
-            return rating_class.split()[-1] if rating_class else None
+        def extract_rating() -> Optional[int]:
+            rating_class = response.css("p.star-rating::attr(class)").get()
+            if not rating_class:
+                return None
+            rating_map = {
+                "One": 1,
+                "Two": 2,
+                "Three": 3,
+                "Four": 4,
+                "Five": 5,
+            }
+            rating_str = rating_class.split()[-1]
+            return rating_map.get(rating_str)
 
         def extract_description() -> Optional[str]:
             desc = response.css("#product_description ~ p::text").get()
@@ -58,11 +58,20 @@ class BooksSpider(scrapy.Spider):
                 "/following-sibling::td/text()"
             ).get()
 
-        yield Book(
+        def extract_amount_in_stock() -> Optional[int]:
+            amount_str = response.css(".availability::text").re_first(r"\d+")
+            return int(amount_str) if amount_str else None
+
+        def extract_price() -> Optional[float]:
+            price_str = response.css(".price_color::text").get()
+            if not price_str:
+                return None
+            return float(price_str.replace("£", "").strip())
+
+        yield EcommerceItem(
             title=response.css("h1::text").get(),
-            price=response.css(".price_color::text").get(),
-            amount_in_stock=response.css(
-                ".availability::text").re_first(r"\d+"),
+            price=extract_price(),
+            amount_in_stock=extract_amount_in_stock(),
             rating=extract_rating(),
             category=extract_category(),
             description=extract_description(),
