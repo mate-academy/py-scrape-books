@@ -1,57 +1,36 @@
-from typing import Any
+from typing import Generator
 
 import scrapy
 from scrapy.http import Response
-
-STR_TO_INT = {
-    "One": 1,
-    "Two": 2,
-    "Three": 3,
-    "Four": 4,
-    "Five": 5,
-}
+from word2number import w2n
 
 
-class BooksSpider(scrapy.Spider):
-    name = "books"
+class BookSpider(scrapy.Spider):
+    name = "book"
     allowed_domains = ["books.toscrape.com"]
-    start_urls = ["https://books.toscrape.com/index.html"]
+    start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs: Any):
-        pass
-        for book in response.css(".product_pod"):
-            book_url = book.css("h3 a::attr(href)").get()
-            yield response.follow(book_url, callback=self.parse_book)
+    def parse(self, response):
+        book_page_links = response.css("a[title]")
+        yield from response.follow_all(book_page_links, self.parse_book)
 
-        next_page = response.css("ul.pager li.next a::attr(href)").get()
-        if next_page:
-            yield response.follow(next_page, callback=self.parse)
+        pagination_links = response.css("li.next a")
+        yield from response.follow_all(pagination_links, self.parse)
 
-    def parse_book(self, response: Response, **kwargs: Any):
+    def parse_book(self, response: Response) -> Generator:
+
         yield {
-            "title": response.css(".product_main h1::text").get(),
+            "title": response.css(".product_page h1::text").get(),
             "price": float(
-                response.css(".product_main p.price_color::text")
-                .get()
-                .replace("£", "")
+                response.css(".price_color::text").get().replace("£", "")
             ),
-            "amount_in_stock": int(
-                response.css(".product_main p.instock::text")
-                .getall()[1]
-                .replace("(", "")
-                .strip()
-                .split()[2]
+            "amount_in_stock": response.css(
+                "p.instock.availability::text"
+            ).re_first(r"\((\d+)\s"),
+            "rating": w2n.word_to_num(
+                response.css("p.star-rating").attrib["class"].split()[1]
             ),
-            "rating": STR_TO_INT[
-                response.css(".product_main p.star-rating::attr(class)")
-                .get()
-                .split(" ")[-1]
-            ],
-            "category": response.css(
-                "ul.breadcrumb li:nth-last-child(2) a::text"
-            ).get(),
-            "description": response.css(
-                "#product_description + p::text"
-            ).get(),
-            "UPC": response.css("table.table tr:first-child td::text").get(),
+            "category": response.css(".breadcrumb > li a::text").getall()[2],
+            "description": response.css(".product_page > p::text").get(),
+            "upc": response.css(".table-striped td::text").get(),
         }
