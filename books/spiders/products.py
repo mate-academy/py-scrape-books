@@ -1,6 +1,8 @@
 import scrapy
 from scrapy.http import Response
 
+from books.items import BooksItem
+
 WORD2NUM = {'One':1,'Two':2,'Three':3,'Four':4,'Five':5}
 
 class ProductsSpider(scrapy.Spider):
@@ -40,5 +42,6 @@ class ProductsSpider(scrapy.Spider):
         item["upc"] = response.css('th:contains("UPC") + td::text').get()
         item["amount_in_stock"] = response.css('th:contains("Availability") + td::text').get().split()[2][1:]
         yield item
+
 
 
