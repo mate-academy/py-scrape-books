@@ -1,7 +1,7 @@
+import re
+
 import scrapy
 from scrapy.http import Response
-
-from books.items import BooksItem
 
 WORD2NUM = {'One':1,'Two':2,'Three':3,'Four':4,'Five':5}
 
@@ -17,7 +17,6 @@ class ProductsSpider(scrapy.Spider):
             yield response.follow(href, callback=self.parse_category)
 
     def parse_category(self, response):
-        category = (response.css('.breadcrumb li.active::text').get() or '').strip()
         for product in response.css('article.product_pod'):
 
             title = product.css('h3 a::attr(title)').get()
@@ -30,7 +29,7 @@ class ProductsSpider(scrapy.Spider):
 
             yield response.follow(
                 href, callback=self.parse_book,
-                cb_kwargs={"item": {"category": category, "title": title, "price": price, "rating": rating}})
+                cb_kwargs={"item": {"title": title, "price": price, "rating": rating}})
 
         next_page = response.css('li.next a::attr(href)').get()
         if next_page:
@@ -38,9 +37,15 @@ class ProductsSpider(scrapy.Spider):
 
 
     def parse_book(self, response, item):
-        item["description"] = response.css('#product_description ~ p::text').get()
-        item["upc"] = response.css('th:contains("UPC") + td::text').get()
-        item["amount_in_stock"] = response.css('th:contains("Availability") + td::text').get().split()[2][1:]
+        category = (response.css('ul.breadcrumb li:nth-last-child(2) a::text').get() or '').strip()
+        item["category"] = category
+        item["description"] = (response.css('#product_description + p::text').get(default='') or '').strip()
+        item["upc"] = response.xpath('//th[normalize-space()="UPC"]/following-sibling::td/text()').get()
+        availability_text = response.xpath(
+            '//th[normalize-space()="Availability"]/following-sibling::td/text()'
+        ).get() or ''
+        m = re.search(r'(\d+)', availability_text)
+        item["amount_in_stock"] = int(m.group(1)) if m else 0
         yield item
 
 
