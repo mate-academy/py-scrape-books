@@ -1,8 +1,7 @@
 import re
-from pathlib import Path
-
 import scrapy
-from scrapy.http import Response, response
+from scrapy.http import Response
+from book.items import BookItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -11,10 +10,9 @@ class BooksSpider(scrapy.Spider):
     start_urls = ["https://books.toscrape.com/"]
 
     def parse(self, response):
-
         categories = response.css("div.side_categories ul li ul li a")
         for cat in categories:
-            category_name = cat.css("::text").get().strip()
+            category_name = cat.css("::text").get(default="").strip()
             category_url = response.urljoin(cat.attrib["href"])
             yield scrapy.Request(
                 category_url,
@@ -48,15 +46,14 @@ class BooksSpider(scrapy.Spider):
         rating = rating_class.replace("star-rating", "").strip()
 
         description = response.css("#product_description ~ p::text").get(default="")
-
         upc = response.xpath('//th[text()="UPC"]/following-sibling::td/text()').get(default="")
 
-        yield {
-            "title": response.css("div.product_main h1::text").get(default=""),
-            "price": response.css("p.price_color::text").get(default=""),
-            "amount_in_stock": amount_in_stock,
-            "rating": rating,
-            "category": category,
-            "description": description,
-            "upc": upc,
-        }
+        yield BookItem(
+            title=response.css("div.product_main h1::text").get(default=""),
+            price=response.css("p.price_color::text").get(default=""),
+            amount_in_stock=amount_in_stock,
+            rating=rating,
+            category=category,
+            description=description,
+            upc=upc,
+        )
