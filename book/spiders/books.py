@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import scrapy
@@ -39,12 +40,23 @@ class BooksSpider(scrapy.Spider):
             )
 
     def parse_book(self, response: Response, category):
+        stock_text = ''.join(response.css("p.instock.availability::text").getall()).strip()
+        amount_match = re.search(r"\d+", stock_text)
+        amount_in_stock = int(amount_match.group()) if amount_match else 0
+
+        rating_class = response.css("p.star-rating::attr(class)").get(default="")
+        rating = rating_class.replace("star-rating", "").strip()
+
+        description = response.css("#product_description ~ p::text").get(default="")
+
+        upc = response.xpath('//th[text()="UPC"]/following-sibling::td/text()').get(default="")
+
         yield {
-            "title": response.css("div.product_main h1::text").get(),
-            "price": response.css("p.price_color::text").get(),
-            "amount_in_stock": response.css("p.instock.availability::text").get(),
-            "rating": response.css("p.star-rating::attr(class)").get(),
+            "title": response.css("div.product_main h1::text").get(default=""),
+            "price": response.css("p.price_color::text").get(default=""),
+            "amount_in_stock": amount_in_stock,
+            "rating": rating,
             "category": category,
-            "description": response.css("#product_description ~ p::text").get(),
-            "upc": response.css("table.table tr:nth-child(1) td::text").get(),
+            "description": description,
+            "upc": upc,
         }
