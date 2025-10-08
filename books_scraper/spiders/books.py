@@ -1,7 +1,6 @@
 from typing import Generator, Union
 
 import scrapy
-from scrapy import Request
 
 from books_scraper.items import BooksScraperItem
 from scrapy.http import Response
@@ -25,7 +24,7 @@ class BooksSpider(scrapy.Spider):
             self,
             response: Response,
             **kwargs
-    ) -> Generator[Union[Request, BooksScraperItem], None, None]:
+    ) -> Generator[Union[scrapy.Request, BooksScraperItem], None, None]:
         for book in response.css("article.product_pod h3 a"):   # type: ignore
             link = book.attrib["href"]
             full_link = response.urljoin(link)
@@ -48,11 +47,11 @@ class BooksSpider(scrapy.Spider):
         available = response.css("p.availability::text").re_first(r"\d+")
         item["amount_in_stock"] = int(available) if available else 0
 
-        item["rating"] = (
-            response.css("p.star-rating::attr(class)").get().split()[-1]
-        )
+        rating = response.css("p.star-rating::attr(class)").get()
+        item["rating"] = rating.split()[-1] if rating else "Unknown"
 
-        item["category"] = response.css("ul.breadcrumb li a::text")[-1].get()
+        category = response.css("ul.breadcrumb li a::text").getall()
+        item["category"] = category[-1] if category else "Unknown"
 
         description = response.css("div#product_description ~ p::text").get()
         item["description"] = description.strip() if description else ""

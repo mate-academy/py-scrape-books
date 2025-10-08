@@ -6,7 +6,6 @@
 from scrapy import signals
 
 # useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
 
 
 class BooksScraperSpiderMiddleware:
@@ -43,11 +42,11 @@ class BooksScraperSpiderMiddleware:
         # Should return either None or an iterable of Request or item objects.
         pass
 
-    async def process_start(self, start):
+    def process_start_requests(self, start_requests, spider):
         # Called with an async iterator over the spider start() method or the
         # maching method of an earlier spider middleware.
-        async for item_or_request in start:
-            yield item_or_request
+        for request in start_requests:
+            yield request
 
     def spider_opened(self, spider):
         spider.logger.info("Spider opened: %s" % spider.name)

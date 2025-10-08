@@ -5,9 +5,9 @@
 
 
 # useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
 
 
 class BooksScraperPipeline:
     def process_item(self, item, spider):
+        # Passthrough pipeline — no processing
         return item
