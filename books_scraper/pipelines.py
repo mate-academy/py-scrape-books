@@ -4,9 +4,6 @@
 # See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 
 
-# useful for handling different item types with a single interface
-
-
 class BooksScraperPipeline:
     def process_item(self, item, spider):
         # Passthrough pipeline — no processing

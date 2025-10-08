@@ -12,7 +12,7 @@ BOT_NAME = "books_scraper"
 SPIDER_MODULES = ["books_scraper.spiders"]
 NEWSPIDER_MODULE = "books_scraper.spiders"
 
-ADDONS = {}
+# ADDONS = {}
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent

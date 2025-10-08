@@ -5,8 +5,6 @@
 
 from scrapy import signals
 
-# useful for handling different item types with a single interface
-
 
 class BooksScraperSpiderMiddleware:
     # Not all methods need to be defined. If a method is not defined,
@@ -43,8 +41,6 @@ class BooksScraperSpiderMiddleware:
         pass
 
     def process_start_requests(self, start_requests, spider):
-        # Called with an async iterator over the spider start() method or the
-        # maching method of an earlier spider middleware.
         for request in start_requests:
             yield request
 

@@ -10,7 +10,6 @@ class BooksSpider(scrapy.Spider):
     name = "books"
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/catalogue/page-1.html"]
-    base_url = "https://books.toscrape.com/catalogue/"
     custom_settings = {
         "FEEDS": {
             "books.jl": {
@@ -50,8 +49,8 @@ class BooksSpider(scrapy.Spider):
         rating = response.css("p.star-rating::attr(class)").get()
         item["rating"] = rating.split()[-1] if rating else "Unknown"
 
-        category = response.css("ul.breadcrumb li a::text").getall()
-        item["category"] = category[-1] if category else "Unknown"
+        category = response.css("ul.breadcrumb li.active::text").get()
+        item["category"] = category.strip() if category else "Unknown"
 
         description = response.css("div#product_description ~ p::text").get()
         item["description"] = description.strip() if description else ""
