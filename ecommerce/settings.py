@@ -85,3 +85,10 @@ DOWNLOAD_DELAY = 1
 
 # Set settings whose default value is deprecated to a future-proof value
 FEED_EXPORT_ENCODING = "utf-8"
+
+FEEDS = {
+    "books.jl": {
+        "format": "jsonlines",
+        "encoding": "utf-8",
+    },
+}
