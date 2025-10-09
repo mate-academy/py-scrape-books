@@ -1,5 +1,6 @@
 import re
 import scrapy
+from ecommerce.items import EcommerceItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -10,26 +11,34 @@ class BooksSpider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.count = 0
+        self.scheduled_count = 0
+        self.limit = 1000
 
     def parse(self, response):
         for book in response.css("article.product_pod"):
-            if self.count >= 1000:
+            if self.scheduled_count >= self.limit:
                 return
-            yield response.follow(book.css("h3 a::attr(href)").get(), callback=self.parse_book)
+
+            book_url = book.css("h3 a::attr(href)").get()
+            if book_url:
+                self.scheduled_count += 1
+                yield response.follow(book_url, callback=self.parse_book)
 
         next_page = response.css("li.next a::attr(href)").get()
-        if next_page and self.count < 1000:
+        if next_page and self.scheduled_count < self.limit:
             yield response.follow(next_page, callback=self.parse)
 
     def parse_book(self, response):
         self.count += 1
 
-        # ціна
+        item = EcommerceItem()
+
         price_text = response.css("p.price_color::text").get()
         price = float(price_text.replace("£", "")) if price_text else None
 
         stock_text = "".join(response.css("p.instock.availability::text").getall()).strip()
-        amount_in_stock = int(re.search(r"(\d+)", stock_text).group(1)) if re.search(r"(\d+)", stock_text) else None
+        m = re.search(r"(\d+)", stock_text)
+        amount_in_stock = int(m.group(1)) if m else None
 
         rating_class = response.css("p.star-rating::attr(class)").get()
         rating_word = rating_class.split()[-1] if rating_class else None
@@ -40,15 +49,14 @@ class BooksSpider(scrapy.Spider):
         description = desc.strip() if desc else ""
 
         category = response.css("ul.breadcrumb li:nth-child(3) a::text").get()
-
         upc = response.xpath("//th[text()='UPC']/following-sibling::td/text()").get()
 
-        yield {
-            "title": response.css("div.product_main h1::text").get(),
-            "price": price,
-            "amount_in_stock": amount_in_stock,
-            "rating": rating,
-            "category": category,
-            "description": description,
-            "upc": upc,
-        }
+        item["title"] = response.css("div.product_main h1::text").get()
+        item["price"] = price
+        item["amount_in_stock"] = amount_in_stock
+        item["rating"] = rating
+        item["category"] = category
+        item["description"] = description
+        item["upc"] = upc
+
+        yield item
