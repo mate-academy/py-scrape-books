@@ -51,7 +51,9 @@ class ProductsSpider(scrapy.Spider):
         ).getall()
         stock = int("".join([i for i in str(stock_text).strip() if i.isdigit()]))
         category = str(response.css(".breadcrumb a::text").getall()[-1])
-        description = response.css("#product_description ~ p::text").get().strip()
+        description = response.css(
+            "#product_description ~ p::text"
+        ).get(default="").strip()
         upc = response.css(".table.table-striped tr td::text").get()
 
         yield {
