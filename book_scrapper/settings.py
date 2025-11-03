@@ -14,6 +14,15 @@ NEWSPIDER_MODULE = "book_scrapper.spiders"
 
 ADDONS = {}
 
+FEED_EXPORT_FIELDS = [
+    "title",
+    "price",
+    "amount_in_stock",
+    "rating",
+    "category",
+    "description",
+    "upc",
+]
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 # USER_AGENT = "book_scrapper (+http://www.yourdomain.com)"

@@ -2,9 +2,8 @@ from typing import Any
 
 import scrapy
 from scrapy.http import Response
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from twisted.internet.defer import Deferred
+
+from book_scrapper.items import BookScrapperItem
 
 STARS_MAP = {
     "Zero": 0,
@@ -21,42 +20,32 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com"]
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.driver = webdriver.Edge()
-
-    def close(self, reason: str) -> Deferred[None] | None:
-        self.driver.quit()
-        return super().close(self, reason)
-
     def parse(self, response: Response, **kwargs: Any) -> Any:
         for book in response.css("article.product_pod"):
-            yield self._parse_book_info(response, book)
+            url = response.urljoin(book.css("a::attr(href)").get())
+            yield scrapy.Request(url, callback=self._parse_book_info)
 
         next_page = response.css("li.next > a::attr(href)").get()
         if next_page is not None:
             yield response.follow(next_page, callback=self.parse)
 
-    def _parse_book_info(self, response: Response, book) -> dict[str, Any]:
-        url = response.urljoin(book.css("a::attr(href)").get())
-        self.driver.get(url)
+    def _parse_book_info(self, response: Response) -> BookScrapperItem:
+        book_item = BookScrapperItem()
 
-        title = self.driver.find_element(By.CSS_SELECTOR, "div.product_main > h1").text
-        price_text = self.driver.find_element(By.CSS_SELECTOR, "p.price_color").text[1:]
-        in_stock_text = self.driver.find_element(By.CSS_SELECTOR, "p.instock.availability").text
-        rating_class = self.driver.find_element(By.CSS_SELECTOR, "p.star-rating").get_attribute("class")
-        category_element = self.driver.find_element(By.CSS_SELECTOR, "ul.breadcrumb")
-        category = category_element.find_elements(By.CSS_SELECTOR, "li")[2].text
-        description = self.driver.find_element(By.CSS_SELECTOR, "article > p").text
-        table = self.driver.find_element(By.CSS_SELECTOR, "table.table-striped")
-        upc = table.find_element(By.CSS_SELECTOR, "tbody > tr > td").text
+        book_item["title"] = response.css("div.product_main > h1::text").get()
+        book_item["price"] = response.css("p.price_color::text").get()[1:]
+        book_item["amount_in_stock"] = (
+            response.css("p.instock::text").getall()[1].strip().split()[-2][1:]
+        )
+        book_item["rating"] = STARS_MAP.get(
+            response.css("p.star-rating::attr(class)").get().split()[-1]
+        )
+        book_item["category"] = response.css(
+            "ul.breadcrumb > li:nth-child(3) a::text"
+        ).get()
+        book_item["description"] = response.css("article > p::text").get()
+        book_item["upc"] = response.css(
+            "table.table-striped tr:nth-child(1) td::text"
+        ).get()
 
-        return {
-            "title": title,
-            "price": float(price_text),
-            "amount_in_stock": int(in_stock_text.split()[-2][1:]),
-            "rating": STARS_MAP.get(rating_class.split()[-1]),
-            "category": category,
-            "description": description,
-            "upc": upc,
-        }
+        return book_item
