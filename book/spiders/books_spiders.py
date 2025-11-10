@@ -48,14 +48,20 @@ class BookSpider(scrapy.Spider):
         upc_location = response.css(".table tr")[0]
         yield {
             "title": main_block.css("h1::text").get(),
+
             "price": float(main_block.css(
                 ".price_color::text"
             ).get().replace("£", "")),
+
             "amount_in_stock": int(match.group(1)) if match else 0,
+
             "rating": self.rating_dict[main_block.css(
                 ".star-rating::attr(class)"
             ).get().replace("star-rating ", "")],
+
             "category": category_location.css("a::text").get(),
-            "description": response.css("#content_inner p::text")[10].get(),
+
+            "description": response.css("#product_description + p::text").get(),
+
             "upc": upc_location.css("td::text").get()
         }

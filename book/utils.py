@@ -14,7 +14,7 @@ def scrap_pagination_urls(home_url: str) -> List[str]:
     try:
         driver = webdriver.Firefox(options=options)
         driver.get(home_url)
-        urls = []
+        urls = [home_url]
         next_link = driver.find_element(By.CLASS_NAME, "next")
 
         while True:
