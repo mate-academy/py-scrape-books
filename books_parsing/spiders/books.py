@@ -7,7 +7,6 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    # Helper: safe .get()
     def safe_get(self, selector, default=None):
         value = selector.get()
         return value if value is not None else default
@@ -28,7 +27,6 @@ class BooksSpider(scrapy.Spider):
         rating_raw = self.safe_get(response.css("p.star-rating::attr(class)"))
         category_raw = self.safe_get(response.css("ul.breadcrumb li:nth-child(3) a::text"))
 
-        # Sanitize values if not missing
         price = price_raw.replace("£", "") if price_raw else None
         rating = (
             rating_raw.replace("star-rating", "").strip()
