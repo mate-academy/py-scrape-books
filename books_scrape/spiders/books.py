@@ -5,6 +5,8 @@ import scrapy
 from scrapy import Request
 from scrapy.http import Response
 
+from books_scrape.items import BooksScrapeItem
+
 
 class BooksSpider(scrapy.Spider):
     name = "books"
@@ -27,21 +29,31 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     @staticmethod
-    def parse_book(response: Response) -> Generator[dict]:
+    def parse_book(response: Response) -> Generator[BooksScrapeItem]:
         raw = response.xpath(
             "//th[text()='Availability']/following-sibling::td/text()"
         ).get()
 
-        quantity = int(re.search(r"\d+", raw).group())
-        yield {
-            "title": response.meta["title"],
-            "price": response.meta["price"],
-            "amount_in_stock": quantity,
-            "rating": response.css("p.star-rating::attr(class)")
-            .get().split()[-1],
-            "category": response.css("ul.breadcrumb li:nth-child(3) a::text")
+        quantity = 0
+        if isinstance(raw, str):
+            quantity = int(re.search(r"\d+", raw).group())
+
+        rating = 0
+        rating_response = response.css("p.star-rating::attr(class)").get()
+        if rating_response is not None:
+            rating = rating_response.split()[-1]
+
+        yield BooksScrapeItem(
+            title=response.meta["title"],
+            price=response.meta["price"],
+            amount_in_stock=quantity,
+            rating=rating,
+            category=response.css("ul.breadcrumb li:nth-child(3) a::text")
             .get(),
-            "description": response.css("p.description::text").get(),
-            "upc": response
+            description=response.xpath(
+                "//div[@id='product_description']/"
+                "following-sibling::p[1]/text()"
+            ).get(default=""),
+            upc=response
             .xpath("//th[text()='UPC']/following-sibling::td/text()").get(),
-        }
+        )
