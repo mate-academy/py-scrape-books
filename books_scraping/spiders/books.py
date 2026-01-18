@@ -5,7 +5,6 @@ from collections.abc import Generator
 import scrapy
 from scrapy import Request
 from scrapy.http import Response
-from pathlib import Path
 
 
 class BooksSpider(scrapy.Spider):
@@ -58,10 +57,6 @@ class BooksSpider(scrapy.Spider):
     def parse(self, response: Response, **kwargs) -> Generator[
         Request, None, None
     ]:
-        filename = "books.html"
-        Path(filename).write_bytes(response.body)
-        self.log(f"Saved file {filename}")
-
         book_cards = response.css(".product_pod")
         links_to_detail_pages = [
             book_card.css("a::attr(href)").get() for book_card in book_cards
