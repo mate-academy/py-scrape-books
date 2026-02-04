@@ -1,4 +1,4 @@
-# Scrapy settings for books project
+# Scrapy settings for books1 project
 #
 # For simplicity, this file contains only settings considered important or
 # commonly used. You can find more settings consulting the documentation:
@@ -16,7 +16,7 @@ ADDONS = {}
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = "books (+http://www.yourdomain.com)"
+#USER_AGENT = "books1 (+http://www.yourdomain.com)"
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
@@ -41,13 +41,13 @@ DOWNLOAD_DELAY = 1
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    "books.middlewares.BooksSpiderMiddleware": 543,
+#    "books1.middlewares.BooksSpiderMiddleware": 543,
 #}
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    "books.middlewares.BooksDownloaderMiddleware": 543,
+#    "books1.middlewares.BooksDownloaderMiddleware": 543,
 #}
 
 # Enable or disable extensions
@@ -59,7 +59,7 @@ DOWNLOAD_DELAY = 1
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 #ITEM_PIPELINES = {
-#    "books.pipelines.BooksPipeline": 300,
+#    "books1.pipelines.BooksPipeline": 300,
 #}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
