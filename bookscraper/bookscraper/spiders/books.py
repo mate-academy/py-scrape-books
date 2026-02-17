@@ -1,5 +1,6 @@
 import scrapy
 from bookscraper.items import BookItem
+import re
 
 
 class BooksSpider(scrapy.Spider):
@@ -21,17 +22,17 @@ class BooksSpider(scrapy.Spider):
         book = BookItem()
 
         book["title"] = response.css("div.product_main h1::text").get()
-        book["price"] = response.css("p.price_color::text").get()
+        raw_price = response.css("p.price_color::text").get()
+        book["price"] = raw_price.strip() if raw_price else None
         book["upc"] = response.xpath(
             "//th[text()='UPC']/following-sibling::td/text()").get()
         book["category"] = response.xpath(
             "//ul[@class='breadcrumb']/li[3]/a/text()").get()
-        book["description"] = response.xpath(
+        raw_desc = response.xpath(
             "//div[@id='product_description']/following-sibling::p/text()").get()
+        book["description"] = raw_desc.strip() if raw_desc else None
 
-        availability_text = response.css(
-            "p.instock.availability::text").getall()
-        availability_text = "".join(availability_text).strip()
+        availability_text = "".join(response.css("p.instock.availability::text").getall()).strip()
         book["amount_in_stock"] = self.extract_stock_count(availability_text)
 
         rating_class = response.css("p.star-rating::attr(class)").get()
@@ -41,7 +42,6 @@ class BooksSpider(scrapy.Spider):
 
     def extract_stock_count(self, text):
         if text:
-            import re
             match = re.search(r"\((\d+)\s+available\)", text)
             if match:
                 return int(match.group(1))
