@@ -1,5 +1,6 @@
 import scrapy
 
+from book_scraper.items import BookScraperItem
 
 RATING_MAP = {
     "One": 1,
@@ -16,10 +17,9 @@ class BooksSpider(scrapy.Spider):
     start_urls = ["https://books.toscrape.com/"]
 
     def parse(self, response):
-        for book_url in response.css(
-                "article.product_pod h3 a::attr(href)"
-        ).getall():
+        for book_url in response.css("article.product_pod h3 a::attr(href)").getall():
             yield response.follow(book_url, callback=self.parse_book)
+
         next_page = response.css("li.next a::attr(href)").get()
         if next_page:
             yield response.follow(next_page, callback=self.parse)
@@ -30,27 +30,26 @@ class BooksSpider(scrapy.Spider):
             for row in response.css("table.table-striped tr")
         }
 
-        yield {
-            "title": response.css("h1::text").get(),
-            "price": float(
-                response.css(
-                    "p.price_color::text"
-                ).get().replace("£", "").strip()
+        item = BookScraperItem()
+        item["title"] = response.css("h1::text").get()
+        item["price"] = float(
+            response.css("p.price_color::text").get().replace("£", "").strip()
+        )
+        item["amount_in_stock"] = int(
+            response.css("p.availability::text").re_first(r"\d+")
+        )
+        item["rating"] = RATING_MAP.get(
+            response.css("p.star-rating::attr(class)").re_first(
+                r"star-rating (\w+)"
             ),
-            "amount_in_stock": int(
-                response.css("p.availability::text").re_first(r"\d+")
-            ),
-            "rating": RATING_MAP.get(
-                response.css("p.star-rating::attr(class)").re_first(
-                    r"star-rating (\w+)"
-                ),
-                0,
-            ),
-            "category": response.css(
-                "ul.breadcrumb li:nth-child(3) a::text"
-            ).get(),
-            "description": response.css("#product_description + p::text").get(
-                default=""
-            ),
-            "upc": table.get("UPC"),
-        }
+            0,
+        )
+        item["category"] = response.css(
+            "ul.breadcrumb li:nth-child(3) a::text"
+        ).get()
+        item["description"] = response.css(
+            "#product_description + p::text"
+        ).get(default="")
+        item["upc"] = table.get("UPC")
+
+        yield item
