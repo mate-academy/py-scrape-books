@@ -12,19 +12,24 @@ class BooksSpider(CrawlSpider):
 
     rules = (
         Rule(
-            LinkExtractor(restrict_css=".side_categories > ul > li > ul a"), follow=True
+            LinkExtractor(restrict_css=".side_categories > ul > li > ul a"),
+            follow=True,
+            process_request="add_category_to_request",
         ),
         Rule(LinkExtractor(restrict_css=".next a"), follow=True),
         Rule(LinkExtractor(restrict_css="h3 > a"), callback="parse_book", follow=False),
     )
 
+    def add_category_to_request(self, request, response):
+        category = response.css("h1::text").get()
+        if category:
+            request.meta["category"] = category.strip()
+        return request
+
     def parse_start_url(self, response):
         category = response.css("h1::text").get()
-
-        for book_url in response.css("h3 > a::attr(href)").getall():
-            yield response.follow(
-                book_url, self.parse_book, meta={"category": category}
-            )
+        if category:
+            response.meta["category"] = category.strip()
 
     def parse_book(self, response):
         item = BookItem()
@@ -32,9 +37,11 @@ class BooksSpider(CrawlSpider):
         category = response.meta.get("category")
         if not category:
             category = response.css("ul.breadcrumb li:nth-child(3) a::text").get()
+            if category:
+                category = category.strip()
 
         item["title"] = response.css("h1::text").get()
-        item["category"] = category.strip() if category else None
+        item["category"] = category
 
         price = response.css("p.price_color::text").get()
         item["price"] = clean_price(price)
@@ -46,10 +53,11 @@ class BooksSpider(CrawlSpider):
         rating_class = response.css("p.star-rating::attr(class)").get()
         item["rating"] = convert_rating(rating_class)
 
-        description_parts = response.css("#product_description + p::text").getall()
-        item["description"] = (
-            " ".join(description_parts).strip() if description_parts else None
-        )
+        description_node = response.css("#product_description + p")
+        if description_node:
+            item["description"] = description_node.get()
+        else:
+            item["description"] = None
 
         item["upc"] = self.extract_upc(response)
 
@@ -59,6 +67,6 @@ class BooksSpider(CrawlSpider):
         rows = response.css("table.table-striped tr")
         for row in rows:
             th = row.css("th::text").get()
-            if th and "UPC" in th:
+            if th and th.strip() == "UPC":
                 return row.css("td::text").get()
         return None

@@ -12,8 +12,6 @@ BOT_NAME = "app"
 SPIDER_MODULES = ["app.spiders"]
 NEWSPIDER_MODULE = "app.spiders"
 
-ADDONS = {}
-
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 # USER_AGENT = "app (+http://www.yourdomain.com)"
@@ -21,9 +19,11 @@ ADDONS = {}
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
 
-# Concurrency and throttling settings
-# CONCURRENT_REQUESTS = 16
-CONCURRENT_REQUESTS_PER_DOMAIN = 1
+CONCURRENT_REQUESTS = 16
+CONCURRENT_REQUESTS_PER_DOMAIN = 16
+
+COOKIES_ENABLED = False
+
 DOWNLOAD_DELAY = 0.5
 
 
@@ -90,7 +90,7 @@ FEED_EXPORT_ENCODING = "utf-8"
 FEEDS = {
     "books.jl": {
         "format": "jsonlines",
-        "encoding": "utf8",
+        "encoding": "utf-8",
         "store_empty": False,
         "fields": [
             "title",
