@@ -12,9 +12,16 @@ class BooksPipeline:
     def process_item(self, item, spider):
         adapter = ItemAdapter(item)
 
-        adapter["price"] = float(
-            adapter["price"].replace("£", "")
-        )
+        price_raw = adapter.get("price")
+
+        price = None
+        if price_raw:
+            try:
+                price = float(price_raw.replace("£", "").replace(",", "").strip())
+            except (ValueError, AttributeError):
+                price = None
+
+        adapter["price"] = price
 
         rating_map = {
             "One": 1,
@@ -23,6 +30,11 @@ class BooksPipeline:
             "Four": 4,
             "Five": 5,
         }
-        adapter["rating"] = rating_map.get(adapter["rating"], 0)
+
+        rating_raw = adapter.get("rating")
+        adapter["rating"] = rating_map.get(rating_raw)
+
+        if adapter.get("upc") is None:
+            adapter["upc"] = ""
 
         return item

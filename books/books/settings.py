@@ -97,6 +97,5 @@ FEEDS = {
         "format": "jsonlines",
         "encoding": "utf8",
         "store_empty": False,
-        "indent": 4,
     },
 }

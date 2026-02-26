@@ -9,8 +9,9 @@ class BooksSpider(scrapy.Spider):
 
     def parse(self, response):
         for book in response.css("article.product_pod h3 a"):
-            book_url = book.attrib["href"]
-            yield response.follow(book_url, callback=self.parse_book)
+            book_url = book.css("::attr(href)").get()
+            if book_url:
+                yield response.follow(book_url, callback=self.parse_book)
 
         next_page = response.css("li.next a::attr(href)").get()
         if next_page:
@@ -25,10 +26,24 @@ class BooksSpider(scrapy.Spider):
 
         stock_text = response.css("p.instock.availability::text").getall()
         stock_text = "".join(stock_text).strip()
-        item["amount_in_stock"] = int(stock_text.split("(")[-1].split()[0])
+        amount = None
+        try:
+            if "(" in stock_text:
+                amount = int(stock_text.split("(")[-1].split()[0])
+        except (ValueError, IndexError):
+            amount = None
 
-        rating_class = response.css("p.star-rating").attrib["class"]
-        item["rating"] = rating_class.split()[-1]
+        item["amount_in_stock"] = amount
+
+        rating_class = response.css("p.star-rating::attr(class)").get()
+
+        rating = None
+        if rating_class:
+            parts = rating_class.split()
+            if len(parts) > 1:
+                rating = parts[-1]
+
+        item["rating"] = rating
 
         item["category"] = response.css("ul.breadcrumb li:nth-child(3) a::text").get()
 
@@ -36,9 +51,11 @@ class BooksSpider(scrapy.Spider):
         item["description"] = description if description else ""
 
         table_rows = response.css("table.table.table-striped tr")
+        item["upc"] = ""
+
         for row in table_rows:
             if row.css("th::text").get() == "UPC":
-                item["upc"] = row.css("td::text").get()
+                item["upc"] = row.css("td::text").get(default="")
                 break
 
         yield item
