@@ -1,8 +1,11 @@
 from typing import Any, Generator
 
+import response
 import scrapy
 from scrapy import Request
-from scrapy.http import Response
+from scrapy.http import HtmlResponse, Response
+
+from bookstore.items import BookstoreItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -30,7 +33,7 @@ class BooksSpider(scrapy.Spider):
 
     def parse_book(
             self,
-            response: Response,
+            response: HtmlResponse,
             **kwargs
     ) -> Generator[dict, Any, None]:
         mapping = {
@@ -41,21 +44,28 @@ class BooksSpider(scrapy.Spider):
             "Five": 5,
         }
 
+        item = BookstoreItem()
+
         rating_class = response.css("p.star-rating::attr(class)").get()
         price = response.css("p.price_color::text").get()
 
-        yield {
-            "title": response.css("h1::text").get(),
-            "price": price.replace("£", "") if price else None,
-            "availability": response.css(
-                "table tr:contains('Availability') td::text"
-            ).re_first(r"\d+"),
-            "rating": mapping[rating_class.split()[-1]],
-            "category": response.css(
-                "ul.breadcrumb li:nth-child(3) a::text"
-            ).get(),
-            "description": response.css(
-                "#product_description ~ p::text"
-            ).get(),
-            "upc": response.css("table tr:contains('UPC') td::text").get(),
-        }
+        rating = None
+        if rating_class:
+            rating_name = rating_class.split()[-1]
+            rating = mapping.get(rating_name)
+
+        item["title"] = response.css("h1::text").get()
+        item["price"] = price.replace("£", "") if price else None
+        item["amount_in_stock"] = response.css(
+            "table tr:contains('Availability') td::text"
+        ).re_first(r"\d+")
+        item["rating"] = rating
+        item["category"] = response.css(
+            "ul.breadcrumb li:nth-child(3) a::text"
+        ).get()
+        item["description"] = response.css(
+            "#product_description ~ p::text"
+        ).get()
+        item["upc"] = response.css("table tr:contains('UPC') td::text").get()
+
+        yield item
