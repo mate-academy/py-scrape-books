@@ -1,6 +1,5 @@
 from typing import Any, Generator
 
-import response
 import scrapy
 from scrapy import Request
 from scrapy.http import HtmlResponse, Response
@@ -35,7 +34,7 @@ class BooksSpider(scrapy.Spider):
             self,
             response: HtmlResponse,
             **kwargs
-    ) -> Generator[dict, Any, None]:
+    ) -> Generator[BookstoreItem, Any, None]:
         mapping = {
             "One": 1,
             "Two": 2,
