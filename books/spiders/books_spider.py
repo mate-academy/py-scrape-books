@@ -1,6 +1,8 @@
 import scrapy
 from typing import Generator
 from word2number import w2n
+import re
+from books.items import BooksItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -13,7 +15,7 @@ class BooksSpider(scrapy.Spider):
             partial_data = {
                 "title": book.css("h3 a::attr(title)").get(),
                 "price": float(book.css(
-                    "p.price_color::text").get().replace("£", "")),
+                    "p.price_color::text").get(default="").replace("£", "")),
                 "rating": w2n.word_to_num(book.css(
                     "p.star-rating::attr(class)").get().split()[-1])
             }
@@ -32,19 +34,18 @@ class BooksSpider(scrapy.Spider):
 
     def parse_one_book(
             self, response: scrapy.http.Response, partial_data: dict
-    ) -> Generator[dict, None, None]:
+    ) -> Generator[BooksItem, None, None]:
         def extract_with_css(query: str) -> str:
             return response.css(query).get(default="").strip()
 
         stock_text = extract_with_css("table.table tr:nth-child(6) td::text")
 
-        yield {
+        yield BooksItem({
             **partial_data,
             "amount_in_stock": int(
-                stock_text.split()[2].replace("(", "")
-            ) if stock_text else 0,
+                re.search(r"\d+", stock_text).group()) if stock_text else 0,
             "category": response.css(
                 "ul.breadcrumb li:nth-child(3) a::text").get(),
             "description": extract_with_css("#product_description ~ p::text"),
             "upc": extract_with_css("table.table tr:nth-child(1) td::text"),
-        }
+        })
