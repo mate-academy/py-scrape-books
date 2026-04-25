@@ -15,9 +15,11 @@ class BooksSpider(scrapy.Spider):
             partial_data = {
                 "title": book.css("h3 a::attr(title)").get(),
                 "price": float(book.css(
-                    "p.price_color::text").get(default="").replace("£", "")),
+                    "p.price_color::text").get(
+                    default="0.0").replace("£", "")),
                 "rating": w2n.word_to_num(book.css(
-                    "p.star-rating::attr(class)").get().split()[-1])
+                    "p.star-rating::attr(class)").get(
+                    default="Zero").split()[-1])
             }
 
             book_url = book.css("h3 a::attr(href)").get()
@@ -39,11 +41,11 @@ class BooksSpider(scrapy.Spider):
             return response.css(query).get(default="").strip()
 
         stock_text = extract_with_css("table.table tr:nth-child(6) td::text")
+        stock_match = re.search(r"\d+", stock_text)
 
         yield BooksItem({
             **partial_data,
-            "amount_in_stock": int(
-                re.search(r"\d+", stock_text).group()) if stock_text else 0,
+            "amount_in_stock": int(stock_match.group()) if stock_match else 0,
             "category": response.css(
                 "ul.breadcrumb li:nth-child(3) a::text").get(),
             "description": extract_with_css("#product_description ~ p::text"),
