@@ -1,10 +1,7 @@
-import json
 from typing import AsyncIterator, Any
 
 import scrapy
-from scrapy import Spider
 from scrapy.http import Response
-from twisted.internet.defer import Deferred
 
 rating_dict = {
     "one": 1,
@@ -30,12 +27,7 @@ class BooksSpider(scrapy.Spider):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.book_obj_list = []
         self.catalogue_url = "https://books.toscrape.com/catalogue/"
-
-    def close(self, spider: Spider, reason: str) -> Deferred[None] | None:
-        self.write_jl_file(books=self.book_obj_list)
-        return super().close(spider=spider, reason=reason)
 
     async def start(self) -> AsyncIterator[Any]:
         for page_num in range(1, 51):
@@ -68,12 +60,7 @@ class BooksSpider(scrapy.Spider):
         book_item["description"] = (
             response.css(".product_page > p::text").get()
         )
-        self.book_obj_list.append(book_item)
-
-    def write_jl_file(self, books: list[dict]) -> None:
-        with open("books.jl", "w", encoding="utf-8") as file:
-            for book in books:
-                file.write(json.dumps(dict(book), ensure_ascii=False) + "\n")
+        yield book_item
 
     def parse(self, response: Response, **kwargs: Any) -> Any:
         products_pod_css = response.css(".product_pod")
