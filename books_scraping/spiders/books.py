@@ -3,6 +3,8 @@ from enum import Enum
 import scrapy
 from scrapy.http import Response
 
+from books_scraping.items import BooksScrapingItem
+
 
 class Rating(Enum):
     One = 1
@@ -46,12 +48,12 @@ class BooksSpider(scrapy.Spider):
             '//th[text()="UPC"]/following-sibling::td/text()'
         ).get()
 
-        yield {
-            "title": title,
-            "price": price,
-            "amount_in_stock": amount_in_stock,
-            "rating": rating,
-            "category": category,
-            "description": description,
-            "upc": upc,
-        }
+        yield BooksScrapingItem(
+            title=title,
+            price=price,
+            amount_in_stock=amount_in_stock,
+            rating=rating,
+            category=category,
+            description=description,
+            upc=upc,
+        )
