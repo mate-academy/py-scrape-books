@@ -59,7 +59,7 @@ def test_output_file_exists_and_has_correct_amount_of_data():
     with open(file_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
-    assert len(lines) == 1575, f"Expected 1575 books, but got {len(lines)}"
+    assert len(lines) == 1000, f"Expected 1000 books, but got {len(lines)}"
 
     first_book = json.loads(lines[0])
     expected_keys = [

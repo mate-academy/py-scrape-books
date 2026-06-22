@@ -16,7 +16,7 @@ class BookSpiderSpider(scrapy.Spider):
         if next_page is not None:
             yield response.follow(next_page, callback=self.parse)
 
-    def parse_book(self, response) -> dict:
+    def parse_book(self, response) -> BooksItem:
         item = BooksItem()
 
         rating_mapping = {
