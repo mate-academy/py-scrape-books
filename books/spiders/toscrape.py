@@ -2,6 +2,8 @@ from scrapy.spiders import Rule, CrawlSpider
 from scrapy.linkextractors import LinkExtractor
 from scrapy.http import Response
 
+from books.items import BooksItem
+
 
 class ToscrapeSpider(CrawlSpider):
     name = "toscrape"
@@ -21,44 +23,28 @@ class ToscrapeSpider(CrawlSpider):
         ),
     )
 
-    def parse_item(self, response: Response) -> dict:
-        rating = {
-            "Zero": 0,
-            "One": 1,
-            "Two": 2,
-            "Three": 3,
-            "Four": 4,
-            "Five": 5,
-        }
-        item = {}
+    def parse_item(self, response):
+        item = BooksItem()
         item["title"] = response.xpath(
             '//div[contains(@class, "product_main")]/h1/text()'
         ).get()
-        item["price"] = float(
-            response.xpath(
-                '//div[contains(@class, "product_main")]'
-                '/p[@class="price_color"]/text()'
-            )
-            .get()
-            .replace("£", "")
-            .strip()
-        )
-        item["amount_in_stock"] = int(
-            response.css(".instock.availability::text").re_first(r"\d+")
-        )
-        item["rating"] = rating[
-            response.css(".product_main .star-rating::attr(class)")
-            .get()
-            .replace("star-rating", "")
-            .strip()
-        ]
+        item["price"] = response.xpath(
+            '//div[contains(@class, "product_main")]/p[@class="price_color"]/text()'
+        ).get()
+        item["amount_in_stock"] = response.css(
+            ".instock.availability::text"
+        ).re_first(r"\d+")
+        item["rating"] = response.css(
+            ".product_main .star-rating::attr(class)"
+        ).get()
         item["category"] = response.css(
             ".breadcrumb li:nth-child(3) a::text"
         ).get()
         item["description"] = response.xpath(
-            '//div[@id="product_description"]/../p/text()'
+            '//div[@id="product_description"]/following-sibling::p/text()'
         ).get()
         item["upc"] = response.xpath(
             "//th[text()='UPC']/following-sibling::td/text()"
         ).get()
-        return item
+
+        yield item
