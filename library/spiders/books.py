@@ -3,6 +3,8 @@ import re
 import  scrapy
 from scrapy.http import Response
 
+from library.items import LibraryItem
+
 RATING_MAP = {
     "One": 1,
     "Two": 2,
@@ -18,13 +20,13 @@ class BooksSpider(scrapy.Spider):
 
     def parse(self, response: Response, **kwargs):
         for book in response.css(".product_pod"):
-            item = {
-                "title": book.css("a::attr(title)").get(),
-                "price": float(book.css(".price_color::text").get().replace("£", "")),
-                "rating": RATING_MAP.get(
+            item = LibraryItem(
+                title=book.css("a::attr(title)").get(),
+                price=float(book.css(".price_color::text").get().replace("£", "")),
+                rating=RATING_MAP.get(
                     book.css("p.star-rating::attr(class)").get().replace("star-rating", "").strip()
                 )
-            }
+            )
 
             detail_url = response.urljoin(book.css("a::attr(href)").get())
             yield response.follow(
@@ -38,7 +40,6 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     def parse_book_detail(self, response: Response, **kwargs):
-        item = kwargs["item"]
         item = response.meta["item"]
 
         item["category"] = response.css(
