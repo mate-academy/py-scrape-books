@@ -35,7 +35,7 @@ class BooksSpider(scrapy.Spider):
                 meta={"item": item},
             )
 
-        next_page = response.css(".pager > li")[-1].css("a::attr(href)").get()
+        next_page = response.css(".pager li.next a::attr(href)").get()
         if next_page is not None:
             yield response.follow(next_page, callback=self.parse)
 
