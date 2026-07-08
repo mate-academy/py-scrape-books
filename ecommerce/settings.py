@@ -1,12 +1,3 @@
-# Scrapy settings for ecommerce project
-#
-# For simplicity, this file contains only settings considered important or
-# commonly used. You can find more settings consulting the documentation:
-#
-#     https://docs.scrapy.org/en/latest/topics/settings.html
-#     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
-#     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
-
 BOT_NAME = "ecommerce"
 
 SPIDER_MODULES = ["ecommerce.spiders"]
@@ -19,7 +10,7 @@ ADDONS = {}
 #USER_AGENT = "ecommerce (+http://www.yourdomain.com)"
 
 # Obey robots.txt rules
-ROBOTSTXT_OBEY = True
+ROBOTSTXT_OBEY = False
 
 # Concurrency and throttling settings
 CONCURRENT_REQUESTS = 32
@@ -58,9 +49,16 @@ CONCURRENT_REQUESTS = 32
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    "ecommerce.pipelines.EcommercePipeline": 300,
-#}
+ITEM_PIPELINES = {
+    "ecommerce.pipelines.EcommercePipeline": 300,
+}
+
+FEEDS = {
+    "books.jl": {
+        "format": "jl",
+        "overwrite": True,
+    }
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html

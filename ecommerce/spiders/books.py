@@ -1,4 +1,5 @@
 import scrapy
+from ecommerce.items import EcommerceItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -35,12 +36,12 @@ class BooksSpider(scrapy.Spider):
         stock_numbers_only = "".join(char for char in stock_text if char.isdigit())
         amount_in_stock = int(stock_numbers_only) if stock_numbers_only else 0
 
-        yield {
-            "title": response.css("h1::text").get(),
-            "price": price,
-            "amount_in_stock": amount_in_stock,
-            "rating": self.RATING_MAP.get(rating_word, 0),
-            "category": response.css(".breadcrumb li:nth-last-child(2) a::text").get(),
-            "description": response.css("#product_description + p::text").get(),
-            "upc": upc,
-        }
+        yield EcommerceItem(
+            title=response.css("h1::text").get(),
+            price=price,
+            amount_in_stock=amount_in_stock,
+            rating=self.RATING_MAP.get(rating_word, 0),
+            category=response.css(".breadcrumb li:nth-last-child(2) a::text").get(),
+            description=response.css("#product_description + p::text").get(),
+            upc=upc,
+        )

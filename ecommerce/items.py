@@ -1,13 +1,12 @@
-# Define here the models for your scraped items
-#
-# See documentation in:
-# https://docs.scrapy.org/en/latest/topics/items.html
-
 from dataclasses import dataclass
-
+from typing import Optional
 
 @dataclass
 class EcommerceItem:
-    # define the fields for your item here like:
-    # name: str | None = None
-    pass
+    title: Optional[str] = None
+    price: float = 0.0
+    amount_in_stock: int = 0
+    rating: int = 0
+    category: Optional[str] = None
+    description: Optional[str] = None
+    upc: Optional[str] = None
