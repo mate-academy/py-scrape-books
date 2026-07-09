@@ -2,6 +2,7 @@ import re
 from collections.abc import Generator
 
 import scrapy
+from ..items import BookScraperItem
 from scrapy.http import Response
 
 
@@ -30,7 +31,7 @@ class BooksSpider(scrapy.Spider):
         if next_page:
             yield response.follow(next_page, callback=self.parse)
 
-    def parse_book(self, response: Response) -> dict[str, str | int]:
+    def parse_book(self, response: Response) -> BookScraperItem:
         amount_text = " ".join(
             response.css(".product_main .availability::text").getall()
         )
@@ -41,17 +42,17 @@ class BooksSpider(scrapy.Spider):
         ).get()
         rating_name = rating_class.split()[-1]
 
-        return {
-            "title": response.css("h1::text").get(),
-            "price": response.css(".product_main .price_color::text").get(),
-            "amount_in_stock": int(amount),
-            "rating": self.rating_map[rating_name],
-            "category": response.css(
+        return BookScraperItem(
+            title=response.css("h1::text").get(""),
+            price=response.css(".product_main .price_color::text").get(""),
+            amount_in_stock=int(amount),
+            rating=self.rating_map[rating_name],
+            category=response.css(
                 ".breadcrumb li:nth-last-child(2) a::text"
-            ).get(),
-            "description": response.css("#product_description + p::text")
-            .get(),
-            "upc": response.xpath(
+            ).get(""),
+            description=response.css("#product_description + p::text")
+            .get(""),
+            upc=response.xpath(
                 '//th[text()="UPC"]/following-sibling::td/text()'
-            ).get(),
-        }
+            ).get(""),
+        )
