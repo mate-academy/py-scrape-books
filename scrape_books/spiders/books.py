@@ -1,6 +1,8 @@
+import re
+
 import scrapy
-from selenium import webdriver
-from selenium.webdriver.common.by import By
+
+from scrape_books.items import ScrapeBooksItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -8,12 +10,11 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.driver = webdriver.Chrome()
-
-    def close(self, reason: str):
-        self.driver.quit()
+    custom_settings = {
+        "FEEDS": {
+            "books.jl": {"format": "jsonlines", "overwrite": True},
+        },
+    }
 
     def parse(self, response, **kwargs):
         for book in response.css(".product_pod"):
@@ -25,49 +26,48 @@ class BooksSpider(scrapy.Spider):
             price = float(book.css(".price_color::text").get().replace("£", ""))
 
             book_url = response.urljoin(book.css("h3 a::attr(href)").get())
-            additional_info = self._parse_additional_information(book_url)
 
-            yield {
-                "title": title,
-                "price": price,
-                "amount_in_stock": additional_info["amount_in_stock"],
-                "rating": rating_number,
-                "category": additional_info["category"],
-                "description": additional_info["description"],
-                "upc": additional_info["upc"],
-            }
+            yield scrapy.Request(
+                book_url,
+                callback=self._parse_additional_information,
+                meta={
+                    "title": title,
+                    "price": price,
+                    "rating": rating_number,
+                },
+            )
 
         next_page = response.css(".pager li.next a::attr(href)").get()
         if next_page:
             next_page_url = response.urljoin(next_page)
             yield scrapy.Request(next_page_url, callback=self.parse)
 
-    def _parse_additional_information(self, book_url):
-        self.driver.get(book_url)
+    def _parse_additional_information(self, response):
+        availability_text = response.xpath(
+            "//th[text()='Availability']/following-sibling::td/text()"
+        ).get(default="")
+        match = re.search(r"\d+", availability_text)
+        amount_in_stock = int(match.group()) if match else 0
 
-        amount_in_stock = self.driver.find_element(
-            By.CSS_SELECTOR,
-            ".instock.availability"
-        ).text.replace("(", "").replace(")", "").split()[-2]
+        category = response.xpath(
+            "//ul[@class='breadcrumb']/li[3]/a/text()"
+        ).get(default="").strip()
 
-        category = self.driver.find_element(
-            By.XPATH,
-            "//ul[@class='breadcrumb']/li[3]/a"
-        ).text
+        description = response.css(
+            "#product_description + p::text"
+        ).get(default="").strip()
 
-        description = self.driver.find_element(
-            By.CSS_SELECTOR,
-            "#product_description + p"
-        ).text
+        upc = response.css(
+            ".table-striped tbody tr:nth-child(1) td:nth-child(2)::text"
+        ).get(default="").strip()
 
-        upc = self.driver.find_element(
-            By.CSS_SELECTOR,
-            ".table-striped tbody tr:nth-child(1) td:nth-child(2)"
-        ).text
+        item = ScrapeBooksItem()
+        item["title"] = response.meta["title"]
+        item["price"] = response.meta["price"]
+        item["rating"] = response.meta["rating"]
+        item["amount_in_stock"] = amount_in_stock
+        item["category"] = category
+        item["description"] = description
+        item["upc"] = upc
 
-        return {
-            "amount_in_stock": int(amount_in_stock),
-            "category": category,
-            "description": description,
-            "upc": upc
-        }
+        yield item
