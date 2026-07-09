@@ -8,6 +8,10 @@ from dataclasses import dataclass
 
 @dataclass
 class BookScraperItem:
-    # define the fields for your item here like:
-    # name: str | None = None
-    pass
+    title: str
+    price: str
+    amount_in_stock: int
+    rating: int
+    category: str
+    description: str
+    upc: str
