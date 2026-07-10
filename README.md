@@ -25,3 +25,9 @@ Hints:
 - use scrapy best practices & learn how to learn new frameworks;
 - make your code as clean as possible;
 - separate scraping for different steps to make code cleaner.
+
+## How to run the spider
+
+To run the spider and export all 1000 books into JSON Lines format (`books.jl`), execute the following command in your terminal:
+
+scrapy crawl book_spider -o books.jl
