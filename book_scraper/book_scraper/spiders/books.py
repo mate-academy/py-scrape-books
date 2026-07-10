@@ -10,22 +10,44 @@ RATINGS = {
     "Five": 5,
 }
 
+MAX_BOOKS = 1000
+
 
 class BooksSpider(scrapy.Spider):
     name = "books"
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
+    custom_settings = {
+        "FEEDS": {
+            "books.jl": {
+                "format": "jsonlines",
+                "overwrite": True,
+            },
+        },
+    }
+
+    books_scraped = 0
+
     def parse(self, response: Response, **kwargs) -> None:
         for book in response.css(".product_pod"):
+            if self.books_scraped >= MAX_BOOKS:
+                return
+
             detail_url = book.css("h3 a::attr(href)").get()
             yield response.follow(detail_url, callback=self.parse_book)
 
-        next_page = response.css("li.next a::attr(href)").get()
-        if next_page is not None:
-            yield response.follow(next_page, callback=self.parse)
+        if self.books_scraped < MAX_BOOKS:
+            next_page = response.css("li.next a::attr(href)").get()
+            if next_page is not None:
+                yield response.follow(next_page, callback=self.parse)
 
     def parse_book(self, response: Response) -> None:
+        if self.books_scraped >= MAX_BOOKS:
+            return
+
+        self.books_scraped += 1
+
         yield {
             "title": response.css(".product_main h1::text").get(),
             "price": self.get_price(response),
@@ -65,9 +87,7 @@ class BooksSpider(scrapy.Spider):
     @staticmethod
     def get_description(response: Response) -> str:
         description = response.css("#product_description + p::text").get()
-        if not description:
-            return ""
-        return description.strip()
+        return description.strip() if description else ""
 
     @staticmethod
     def get_upc(response: Response) -> str:
