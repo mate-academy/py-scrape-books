@@ -6,6 +6,7 @@
 #     https://docs.scrapy.org/en/latest/topics/settings.html
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
+from typing import Any
 
 BOT_NAME = "book_scraper"
 
@@ -85,3 +86,15 @@ DOWNLOAD_DELAY = 1
 
 # Set settings whose default value is deprecated to a future-proof value
 FEED_EXPORT_ENCODING = "utf-8"
+
+ITEM_PIPELINES: dict[str, int] = {
+    "book_scraper.pipelines.BookScraperPipeline": 300,
+}
+
+FEEDS: dict[str, dict[str, Any]] = {
+    "books.jl": {
+        "format": "jsonlines",
+        "encoding": "utf8",
+        "overwrite": True,
+    }
+}
