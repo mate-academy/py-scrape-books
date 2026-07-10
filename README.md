@@ -1,27 +1,29 @@
-# Scrape books
+# Books Scraper
 
-- Read [the guideline](https://github.com/mate-academy/py-task-guideline/blob/main/README.md) before start
+This project uses Scrapy to parse books from [https://books.toscrape.com/](https://books.toscrape.com/). 
+It navigates through all 50 pagination pages and extracts detailed information for all 1000 books.
 
+## How to run the spider
+From the root directory of the project, run:
+```bash
+scrapy crawl books
+```
 
-## Task
-Here you will scrape https://books.toscrape.com/ website.
-For each of 1000 books you need to parse this information:
-- title
-- price
-- amount_in_stock
-- rating
-- category
-- description
-- upc
+## Scraped fields:
+- Title
+- Price
+- Amount in stock (defaults to 0 if not found)
+- Rating (converted from text class to integer, defaults to None if not found)
+- Category
+- Description
+- UPC
 
-In this task you should use `scrapy` framework for parsing.
-And implement only 1 spider to do such job.
+## How to run the spider
+From the root directory of the project, run:
+\`\`\`bash
+scrapy crawl books
+\`\`\`
+Because `FEEDS` is configured in `settings.py`, this command will automatically generate (or overwrite) the `books.jl` file in JSON Lines format.
 
-When completed it - save all books into `books.jl` file and commit it.
-This task doesn't have auto-tests, so test it manually.
-
-Hints:
-- use scrapy documentation for searching for all required information;
-- use scrapy best practices & learn how to learn new frameworks;
-- make your code as clean as possible;
-- separate scraping for different steps to make code cleaner.
+## Verification
+The resulting `books.jl` file contains exactly 1000 lines, corresponding to the 1000 books available on the website.
