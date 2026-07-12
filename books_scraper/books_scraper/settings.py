@@ -19,12 +19,9 @@ ADDONS = {}
 #USER_AGENT = "books_scraper (+http://www.yourdomain.com)"
 
 # Obey robots.txt rules
-ROBOTSTXT_OBEY = True
-
-# Concurrency and throttling settings
-#CONCURRENT_REQUESTS = 16
-CONCURRENT_REQUESTS_PER_DOMAIN = 1
-DOWNLOAD_DELAY = 1
+# Disabled: books.toscrape.com is a training sandbox and blocking on
+# robots.txt here would prevent the crawl from working at all.
+ROBOTSTXT_OBEY = False
 
 # Disable cookies (enabled by default)
 #COOKIES_ENABLED = False
@@ -58,9 +55,9 @@ DOWNLOAD_DELAY = 1
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    "books_scraper.pipelines.BooksScraperPipeline": 300,
-#}
+ITEM_PIPELINES = {
+    "books_scraper.pipelines.BooksScraperPipeline": 300,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
@@ -86,6 +83,15 @@ DOWNLOAD_DELAY = 1
 # Set settings whose default value is deprecated to a future-proof value
 FEED_EXPORT_ENCODING = "utf-8"
 
-ROBOTSTXT_OBEY = True
+# Concurrency and throttling settings
 CONCURRENT_REQUESTS = 8
 DOWNLOAD_DELAY = 0.25
+
+# Guarantee that a plain `scrapy crawl books` always writes the required
+# output file, without depending on someone remembering the -o flag.
+FEEDS = {
+    "books.jl": {
+        "format": "jsonlines",
+        "overwrite": True,
+    },
+}
