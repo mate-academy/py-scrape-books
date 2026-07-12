@@ -18,6 +18,3 @@ COOKIES_ENABLED = False
 FEEDS = {
     "books.jl": {"format": "jsonlines", "overwrite": True},
 }
-
-ITEM_PIPELINES = {
-}
