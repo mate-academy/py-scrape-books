@@ -1,4 +1,5 @@
 import scrapy
+from book_scraper.items import BookScraperItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -16,13 +17,8 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     def parse_book_details(self, response):
-
         rating_mapping = {
-            "One": 1,
-            "Two": 2,
-            "Three": 3,
-            "Four": 4,
-            "Five": 5
+            "One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5
         }
         raw_rating = response.css("p.star-rating::attr(class)").get()
         rating_word = raw_rating.replace("star-rating", "").strip() if raw_rating else None
@@ -36,12 +32,13 @@ class BooksSpider(scrapy.Spider):
         if stock_text and "(" in stock_text:
             amount_in_stock = int("".join(filter(str.isdigit, stock_text)))
 
-        yield {
-            "title": response.css("h1::text").get(),
-            "price": price,
-            "amount_in_stock": amount_in_stock,
-            "rating": rating,
-            "category": response.css(".breadcrumb li:nth-last-child(2) a::text").get(),
-            "description": response.xpath("//div[@id='product_description']/following-sibling::p/text()").get(),
-            "upc": upc,
-        }
+        item = BookScraperItem()
+        item["title"] = response.css("h1::text").get()
+        item["price"] = price
+        item["amount_in_stock"] = amount_in_stock
+        item["rating"] = rating
+        item["category"] = response.css(".breadcrumb li:nth-last-child(2) a::text").get()
+        item["description"] = response.xpath("//div[@id='product_description']/following-sibling::p/text()").get()
+        item["upc"] = upc
+
+        yield item
