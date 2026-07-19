@@ -45,6 +45,9 @@ class BooksSpider(scrapy.Spider):
             category=response.css(
                 "ul.breadcrumb li:nth-child(3) a::text"
             ).get(),
+            # The description text is a sibling <p> right after the
+            # #product_description div (which only holds a heading),
+            # so it must be selected via "+", not as a descendant.
             description=response.css(
                 "div#product_description + p::text"
             ).get(default=""),
