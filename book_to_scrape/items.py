@@ -1,13 +1,11 @@
-# Define here the models for your scraped items
-#
-# See documentation in:
-# https://docs.scrapy.org/en/latest/topics/items.html
-
-from dataclasses import dataclass
+import scrapy
 
 
-@dataclass
-class BookToScrapeItem:
-    # define the fields for your item here like:
-    # name: str | None = None
-    pass
+class BookToScrapeItem(scrapy.Item):
+    title = scrapy.Field()
+    price = scrapy.Field()
+    amount_in_stock = scrapy.Field()
+    rating = scrapy.Field()
+    category = scrapy.Field()
+    description = scrapy.Field()
+    upc = scrapy.Field()
