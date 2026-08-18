@@ -1,5 +1,6 @@
 import scrapy
 from scrapy.crawler import CrawlerProcess
+import re
 
 
 class BookSpider(scrapy.Spider):
@@ -23,13 +24,15 @@ class BookSpider(scrapy.Spider):
         
         stock_text = response.css("p.instock.availability::text").getall()
         stock_str = "".join(stock_text).strip()
-        import re
         stock_match = re.search(r"(\d+)", stock_str)
         amount_in_stock = int(stock_match.group(1)) if stock_match else 0
 
+        price_raw = response.css("div.product_main p.price_color::text").get()
+        price_clean = re.sub(r"[^\d.]", "", price_raw) if price_raw else "0.0"
+
         yield {
             "title": response.css("div.product_main h1::text").get(),
-            "price": float(response.css("div.product_main p.price_color::text").get().replace("?", "")),
+            "price": float(price_clean),
             "amount_in_stock": amount_in_stock,
             "rating": rating_map.get(rating_str, 0),
             "category": response.css("ul.breadcrumb li:nth-last-child(2) a::text").get(),
