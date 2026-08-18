@@ -1,0 +1,52 @@
+import scrapy
+from scrapy.crawler import CrawlerProcess
+import re
+
+
+class BookSpider(scrapy.Spider):
+    name = "books"
+    allowed_domains = ["books.toscrape.com"]
+    start_urls = ["https://books.toscrape.com/"]
+
+    def parse(self, response):
+        book_links = response.css("article.product_pod h3 a::attr(href)").getall()
+        for link in book_links:
+            yield response.follow(link, callback=self.parse_book)
+
+        next_page = response.css("li.next a::attr(href)").get()
+        if next_page:
+            yield response.follow(next_page, callback=self.parse)
+
+    def parse_book(self, response):
+        rating_map = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
+        rating_class = response.css("p.star-rating::attr(class)").get()
+        rating_str = rating_class.split()[-1] if rating_class else "One"
+        
+        stock_text = response.css("p.instock.availability::text").getall()
+        stock_str = "".join(stock_text).strip()
+        stock_match = re.search(r"(\d+)", stock_str)
+        amount_in_stock = int(stock_match.group(1)) if stock_match else 0
+
+        price_raw = response.css("div.product_main p.price_color::text").get()
+        price_clean = re.sub(r"[^\d.]", "", price_raw) if price_raw else "0.0"
+
+        yield {
+            "title": response.css("div.product_main h1::text").get(),
+            "price": float(price_clean),
+            "amount_in_stock": amount_in_stock,
+            "rating": rating_map.get(rating_str, 0),
+            "category": response.css("ul.breadcrumb li:nth-last-child(2) a::text").get(),
+            "description": response.css("div#product_description ~ p::text").get("").strip(),
+            "upc": response.css("table.table.table-striped tr:nth-child(1) td::text").get(),
+        }
+
+
+if __name__ == "__main__":
+    process = CrawlerProcess(settings={
+        "FEEDS": {
+            "books.jl": {"format": "jsonlines"},
+        },
+    })
+    process.crawl(BookSpider)
+    process.start()
+
