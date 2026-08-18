@@ -1,4 +1,5 @@
 import scrapy
+from scrapy.crawler import CrawlerProcess
 
 
 class BookSpider(scrapy.Spider):
@@ -7,13 +8,6 @@ class BookSpider(scrapy.Spider):
     start_urls = ["https://books.toscrape.com/"]
 
     def parse(self, response):
-        # ѕарсим ссылки на категории или страницы каталога
-        for category in response.css("side_category .nav-list ul li a"):
-            category_url = category.css("::attr(href)").get()
-            if category_url:
-                yield response.follow(category_url, callback=self.parse_category)
-
-        # »ли обходим страницы каталога напр€мую через пагинацию
         book_links = response.css("article.product_pod h3 a::attr(href)").getall()
         for link in book_links:
             yield response.follow(link, callback=self.parse_book)
@@ -22,16 +16,6 @@ class BookSpider(scrapy.Spider):
         if next_page:
             yield response.follow(next_page, callback=self.parse)
 
-    def parse_category(self, response):
-        book_links = response.css("article.product_pod h3 a::attr(href)").getall()
-        for link in book_links:
-            # ѕревращаем относительный путь в абсолютный с учетом структуры сайта
-            yield response.follow(link.replace("../../../", ""), callback=self.parse_book)
-
-        next_page = response.css("li.next a::attr(href)").get()
-        if next_page:
-            yield response.follow(next_page, callback=self.parse_category)
-
     def parse_book(self, response):
         rating_map = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
         rating_class = response.css("p.star-rating::attr(class)").get()
@@ -39,7 +23,6 @@ class BookSpider(scrapy.Spider):
         
         stock_text = response.css("p.instock.availability::text").getall()
         stock_str = "".join(stock_text).strip()
-        # »звлекаем количество из строки вида "In stock (22 available)"
         import re
         stock_match = re.search(r"(\d+)", stock_str)
         amount_in_stock = int(stock_match.group(1)) if stock_match else 0
@@ -53,4 +36,14 @@ class BookSpider(scrapy.Spider):
             "description": response.css("div#product_description ~ p::text").get("").strip(),
             "upc": response.css("table.table.table-striped tr:nth-child(1) td::text").get(),
         }
+
+
+if __name__ == "__main__":
+    process = CrawlerProcess(settings={
+        "FEEDS": {
+            "books.jl": {"format": "jsonlines"},
+        },
+    })
+    process.crawl(BookSpider)
+    process.start()
 
