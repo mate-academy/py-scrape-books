@@ -9,3 +9,7 @@ CONCURRENT_REQUESTS_PER_DOMAIN = 8
 DOWNLOAD_DELAY = 0.1
 
 FEED_EXPORT_ENCODING = "utf-8"
+
+FEEDS = {
+    "books.jl": {"format": "jsonlines", "overwrite": True},
+}

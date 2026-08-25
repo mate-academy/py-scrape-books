@@ -1,4 +1,5 @@
 import re
+from typing import Iterator
 
 import scrapy
 from scrapy.http import Response
@@ -35,7 +36,9 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def parse(self, response: Response, **kwargs: str) -> None:
+    def parse(
+        self, response: Response, **kwargs: str
+    ) -> Iterator[scrapy.Request]:
         book_links = response.css(".product_pod h3 a::attr(href)")
         for link in book_links:
             yield response.follow(link, callback=self.parse_book)
