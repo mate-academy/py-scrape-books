@@ -7,7 +7,7 @@ import scrapy
 from scrapy.http import Response
 
 
-class BooksSpider(scrapy.Spider):
+class BookSpider(scrapy.Spider):
     """Scrape all catalogue pages and their book detail pages."""
 
     name = "books"
