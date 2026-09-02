@@ -8,6 +8,10 @@ from dataclasses import dataclass
 
 @dataclass
 class EcommerceItem:
-    # define the fields for your item here like:
-    # name: str | None = None
-    pass
+    title: str
+    price: float
+    amount_in_stock: int
+    rating: int
+    category: str
+    description: str | None
+    upc: str

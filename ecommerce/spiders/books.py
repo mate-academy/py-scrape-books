@@ -3,7 +3,7 @@ from collections.abc import Iterator
 import scrapy
 from scrapy.http import Response
 
-BookData = dict[str, str | float | int | None]
+from ecommerce.items import EcommerceItem
 
 
 class BooksSpider(scrapy.Spider):
@@ -28,7 +28,7 @@ class BooksSpider(scrapy.Spider):
         if next_page is not None:
             yield response.follow(next_page, callback=self.parse)
 
-    def _parse_book(self, response: Response) -> Iterator[BookData]:
+    def _parse_book(self, response: Response) -> Iterator[EcommerceItem]:
         amount_in_stock = int(
             response.css("p.instock.availability::text").re_first(r"\d+")
         )
@@ -43,22 +43,22 @@ class BooksSpider(scrapy.Spider):
         }
         rating = rating_map[rating_classes.split()[1]]
 
-        yield {
-            "title": response.css(".product_main h1::text").get(),
-            "price": float(
+        yield EcommerceItem(
+            title=response.css(".product_main h1::text").get(),
+            price=float(
                 response.css(".price_color::text").get().replace("£", "")
             ),
-            "amount_in_stock": amount_in_stock,
-            "rating": rating,
-            "category": (
+            amount_in_stock=amount_in_stock,
+            rating=rating,
+            category=(
                 response.css(".breadcrumb > li")[-2]
                 .css("a::text")
                 .get()
             ),
-            "description": response.css(
+            description=response.css(
                 "#product_description + p::text"
             ).get(),
-            "upc": response.css(
+            upc=response.css(
                 "table.table-striped tr:first-child td::text"
             ).get(),
-        }
+        )
