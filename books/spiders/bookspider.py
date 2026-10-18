@@ -27,9 +27,12 @@ class BookspiderSpider(scrapy.Spider):
             )
 
     def parse_book(self, response: Response):
+
         availability = response.css(
             ".product_main .availability"
-        ).xpath("string(.)").get().strip()
+        ).xpath("string(.)").get()
+
+        availability = availability.strip() if availability else ""
 
         amount_in_stock = re.search(r"\d+", availability)
 
@@ -42,8 +45,11 @@ class BookspiderSpider(scrapy.Spider):
                 ".product_main .price_color::text"
             ).get(),
 
-            "amount_in_stock": int(amount_in_stock.group()),
-
+            "amount_in_stock": (
+                int(amount_in_stock.group())
+                if amount_in_stock
+                else None
+            ),
             "rating": response.css(
                 ".product_main .star-rating::attr(class)"
             ).get().split()[-1],
