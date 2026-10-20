@@ -20,7 +20,7 @@ class BooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     def get_rating(self, response: Response) -> int:
-        rating = response.css("p.star-rating::attr(class)").get()
+        rating = response.css("p.star-rating::attr(class)").get(default="")
         word = rating.replace("star-rating", "").strip()
         return self.rating.get(word, 0)
 
