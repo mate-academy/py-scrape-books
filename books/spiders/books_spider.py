@@ -37,11 +37,11 @@ class BooksSpider(scrapy.Spider):
             title=response.css("h1::text").get(),
             price=float(
                 response.css("div.product_main p.price_color::text")
-                .get()
+                .get(default="0")
                 .replace("£", "")
             ),
             amount_in_stock=int(
-                response.css("p.availability::text").re_first(r"\d+")
+                response.css("p.availability::text").re_first(r"\d+", default="0")
             ),
             rating=self.get_rating(response),
             category=response.css(
