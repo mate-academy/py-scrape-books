@@ -41,7 +41,10 @@ class BooksSpider(scrapy.Spider):
                 .replace("£", "")
             ),
             amount_in_stock=int(
-                response.css("p.availability::text").re_first(r"\d+", default="0")
+                response.css("p.availability::text").re_first(
+                    r"\d+",
+                    default="0"
+                )
             ),
             rating=self.get_rating(response),
             category=response.css(
