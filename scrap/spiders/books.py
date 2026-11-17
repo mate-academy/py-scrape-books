@@ -48,7 +48,7 @@ class BooksSpider(scrapy.Spider):
         self.driver.get(url)
         result = [int(self.driver.find_element(By.CSS_SELECTOR, "p.availability").text.split(" ")[2].replace("(", "")),
                   str(self.driver.find_elements(By.CSS_SELECTOR, "ul.breadcrumb li")[2].find_element(By.TAG_NAME, "a").text),
-                  self.driver.find_element(By.TAG_NAME, "p").text]
+                  self.driver.find_element(By.CSS_SELECTOR, "#product_description + p").text]
         upcs = self.driver.find_elements(By.TAG_NAME, "tr")[0]
         result.append(upcs.find_element(By.TAG_NAME, "td").text)
 
