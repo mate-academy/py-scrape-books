@@ -86,4 +86,13 @@ DOWNLOAD_DELAY = 1
 # Set settings whose default value is deprecated to a future-proof value
 DOWNLOADER_MIDDLEWARE_RESPONSE_EXCEPTIONS = True
 FEED_EXPORT_ENCODING = "utf-8"
-FEED_MODE = "create"
+
+# Надійне налаштування експорту даних у файл books.jl
+FEEDS = {
+    "books.jl": {
+        "format": "jsonlines",
+        "encoding": "utf8",
+        "store_empty": False,
+        "overwrite": True,
+    },
+}
