@@ -86,4 +86,9 @@ DOWNLOAD_DELAY = 0.1
 # Set settings whose default value is deprecated to a future-proof value
 DOWNLOADER_MIDDLEWARE_RESPONSE_EXCEPTIONS = True
 FEED_EXPORT_ENCODING = "utf-8"
-FEED_MODE = "create"
+FEEDS = {
+    "books.jl": {
+        "format": "jsonlines",
+        "overwrite": True,
+    },
+}

@@ -3,6 +3,8 @@ from collections.abc import Generator
 import scrapy
 from scrapy.http import Response
 
+from book_scraper.items import BookScraperItem
+
 
 RATING_VALUES = {
     "One": 1,
@@ -42,7 +44,7 @@ class BookSpider(scrapy.Spider):
     def parse_book(
             self,
             response: Response
-    ) -> Generator[dict[str, str | float | int], None, None]:
+    ) -> Generator[BookScraperItem, None, None]:
         price_text = response.css(
             "p.price_color::text"
         ).get(default="")
@@ -57,23 +59,23 @@ class BookSpider(scrapy.Spider):
         ).getall()
         rating_name = rating_class.split()[-1]
 
-        yield {
-            "title": response.css(
+        yield BookScraperItem(
+            title=response.css(
                 "div.product_main h1::text"
             ).get(default=""),
-            "price": float(price_text.removeprefix("£")),
-            "amount_in_stock": (
+            price=float(price_text.removeprefix("£")),
+            amount_in_stock=(
                 int(stock_text)
                 if stock_text is not None
                 else 0
             ),
-            "rating": RATING_VALUES[rating_name],
-            "category": categories[-1] if categories else "",
-            "description": response.css(
+            rating=RATING_VALUES[rating_name],
+            category=categories[-1] if categories else "",
+            description=response.css(
                 "#product_description + p::text"
             ).get(default=""),
-            "upc": response.xpath(
+            upc=response.xpath(
                 '//th[text()="UPC"]'
                 "/following-sibling::td/text()"
             ).get(default=""),
-        }
+        )
