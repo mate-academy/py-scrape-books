@@ -1,0 +1,90 @@
+"""This module provides some functions and classes to record and report
+references to live object instances.
+
+If you want live objects for a particular class to be tracked, you only have to
+subclass from object_ref (instead of object).
+
+This library has a minimal performance impact.
+"""
+
+from __future__ import annotations
+
+from operator import itemgetter
+from time import monotonic_ns
+from types import NoneType
+from typing import TYPE_CHECKING, Any, Self
+from weakref import WeakKeyDictionary
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+
+live_refs: WeakKeyDictionary[type, WeakKeyDictionary[object, float]] = (
+    WeakKeyDictionary()
+)
+
+
+class object_ref:
+    """Inherit from this class if you want to track live instances with the
+    ``trackref`` module."""
+
+    __slots__ = ()
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        obj = object.__new__(cls)
+        try:
+            refs = live_refs[cls]
+        except KeyError:
+            refs = live_refs[cls] = WeakKeyDictionary()
+        refs[obj] = monotonic_ns()
+        return obj
+
+
+def format_live_refs(
+    ignore: type[Any] | tuple[type[Any], ...] = NoneType,
+) -> str:
+    """Return a tabular representation of tracked objects"""
+    s = "Live References\n\n"
+    now_ns = monotonic_ns()
+    for cls, wdict in sorted(live_refs.items(), key=lambda x: x[0].__name__):
+        if not wdict:
+            continue
+        if issubclass(cls, ignore):
+            continue
+        oldest_ns = min(wdict.values())
+        s += f"{cls.__name__:<30} {len(wdict):6}   oldest: {int((now_ns - oldest_ns) // 1e9)}s ago\n"
+    return s
+
+
+def print_live_refs(
+    ignore: type[Any] | tuple[type[Any], ...] = NoneType,
+) -> None:
+    """Print a report of live references, grouped by class name.
+
+    :param ignore: if given, all objects from the specified class (or tuple of
+        classes) will be ignored.
+    :type ignore: type or tuple
+    """
+    print(format_live_refs(ignore))
+
+
+def get_oldest(class_name: str) -> Any:
+    """Return the oldest object alive with the given class name, or ``None`` if
+    none is found. Use :func:`print_live_refs` first to get a list of all
+    tracked live objects per class name."""
+    for cls, wdict in live_refs.items():
+        if cls.__name__ == class_name:
+            if not wdict:
+                break
+            return min(wdict.items(), key=itemgetter(1))[0]
+    return None
+
+
+def iter_all(class_name: str) -> Iterable[Any]:
+    """Return an iterator over all objects alive with the given class name. Use
+    :func:`print_live_refs` first to get a list of all tracked live objects per
+    class name."""
+    for cls, wdict in live_refs.items():
+        if cls.__name__ == class_name:
+            return wdict.keys()
+    return ()

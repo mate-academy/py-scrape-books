@@ -1,0 +1,224 @@
+from __future__ import annotations
+
+import warnings
+from itertools import chain
+from logging import getLogger
+from typing import TYPE_CHECKING, Any, Self
+
+from scrapy import Request, Spider, signals
+from scrapy.exceptions import (
+    DecompressionError,
+    IgnoreRequest,
+    NotConfigured,
+    ScrapyDeprecationWarning,
+)
+from scrapy.http import BodyFileResponse, Response, TextResponse
+from scrapy.responsetypes import responsetypes
+from scrapy.utils._compression import (
+    _DECOMPRESSION_ERRORS,
+    _DecompressionMaxSizeExceeded,
+    _inflate,
+    _unbrotli,
+    _unzstd,
+    gunzip,
+)
+from scrapy.utils._download_handlers import get_warnsize
+from scrapy.utils.asyncio import run_in_thread
+from scrapy.utils.decorators import _warn_spider_arg
+from scrapy.utils.deprecate import warn_on_deprecated_spider_attribute
+
+if TYPE_CHECKING:
+    from scrapy.crawler import Crawler
+    from scrapy.statscollectors import StatsCollector
+
+
+logger = getLogger(__name__)
+
+ACCEPTED_ENCODINGS: list[bytes] = [b"gzip", b"deflate", b"br", b"zstd"]
+
+# Dispatching to a thread costs a few hundred microseconds. That is
+# negligible next to network latency, but wasted when there is no other
+# in-flight request for the reactor to get back to; above this compressed
+# size, decoding concurrently with other requests outweighs that cost.
+# Tuned by tests/benchmarks/test_httpcompression.py.
+_THREAD_DECODE_MIN_SIZE = 8192
+
+
+class _MaxEncodingCountExceeded(ValueError):
+    def __init__(self, count: int, max_count: int) -> None:
+        self.count = count
+        self.max_count = max_count
+
+
+class HttpCompressionMiddleware:
+    """This middleware allows compressed (gzip, deflate etc.) traffic to be
+    sent/received from websites"""
+
+    def __init__(
+        self,
+        stats: StatsCollector | None = None,
+        *,
+        crawler: Crawler | None = None,
+    ):
+        if not crawler:
+            warnings.warn(
+                "Instantiating HttpCompressionMiddleware without a 'crawler' "
+                "argument is deprecated.",
+                category=ScrapyDeprecationWarning,
+                stacklevel=2,
+            )
+            self.stats = stats
+            self._max_size = 1073741824
+            self._warn_size = 33554432
+            self._max_encodings = 1
+            return
+        self.stats = crawler.stats
+        self._max_size = crawler.settings.getint("DOWNLOAD_MAXSIZE")
+        self._warn_size = crawler.settings.getint("DOWNLOAD_WARNSIZE")
+        self._max_encodings = crawler.settings.getint("COMPRESSION_MAX_ENCODINGS")
+        crawler.signals.connect(self.open_spider, signals.spider_opened)
+
+    @classmethod
+    def from_crawler(cls, crawler: Crawler) -> Self:
+        if not crawler.settings.getbool("COMPRESSION_ENABLED"):
+            raise NotConfigured
+        return cls(crawler=crawler)
+
+    def open_spider(self, spider: Spider) -> None:
+        if hasattr(spider, "download_maxsize"):
+            warn_on_deprecated_spider_attribute("download_maxsize", "DOWNLOAD_MAXSIZE")
+            self._max_size = spider.download_maxsize
+        if hasattr(spider, "download_warnsize"):
+            warn_on_deprecated_spider_attribute(
+                "download_warnsize", "DOWNLOAD_WARNSIZE"
+            )
+            self._warn_size = spider.download_warnsize
+
+    @_warn_spider_arg
+    def process_request(
+        self, request: Request, spider: Spider | None = None
+    ) -> Request | Response | None:
+        if request.meta.get("body_file"):
+            # Their body is written to a file, never decompressed.
+            return None
+        request.headers.setdefault("Accept-Encoding", b", ".join(ACCEPTED_ENCODINGS))
+        return None
+
+    @_warn_spider_arg
+    async def process_response(
+        self, request: Request, response: Response, spider: Spider | None = None
+    ) -> Request | Response:
+        if request.method == "HEAD" or isinstance(response, BodyFileResponse):
+            return response
+        content_encoding = response.headers.getlist("Content-Encoding")
+        if content_encoding:
+            max_size = request.meta.get("download_maxsize", self._max_size)
+            warn_size = get_warnsize(request.meta, self._warn_size)
+            try:
+                decoded_body, content_encoding = await self._handle_encoding(
+                    response.body, content_encoding, max_size
+                )
+            except _DecompressionMaxSizeExceeded as e:
+                msg = (
+                    f"Ignored response {response} because its body "
+                    f"({len(response.body)} B compressed, "
+                    f"{e.decompressed_size} B decompressed so far) exceeded "
+                    f"DOWNLOAD_MAXSIZE ({max_size} B) during decompression."
+                )
+                logger.warning(msg)
+                raise IgnoreRequest(msg) from e
+            except _MaxEncodingCountExceeded as e:
+                msg = (
+                    f"Ignored response {response} because its Content-Encoding "
+                    f"header lists {e.count} supported encodings, which exceeds "
+                    f"COMPRESSION_MAX_ENCODINGS ({e.max_count})."
+                )
+                logger.warning(msg)
+                raise IgnoreRequest(msg) from e
+            except _DECOMPRESSION_ERRORS as e:
+                encodings = b", ".join(content_encoding).decode()
+                raise DecompressionError(
+                    f"Could not decompress {response} ({encodings}): {e}"
+                ) from e
+            if len(response.body) < warn_size <= len(decoded_body):
+                logger.warning(
+                    f"{response} body size after decompression "
+                    f"({len(decoded_body)} B) is larger than the "
+                    f"download warning size ({warn_size} B)."
+                )
+            if content_encoding:
+                self._warn_unknown_encoding(response, content_encoding)
+            response.headers["Content-Encoding"] = content_encoding
+            if self.stats:
+                self.stats.inc_value(
+                    "httpcompression/response_bytes",
+                    len(decoded_body),
+                )
+                self.stats.inc_value("httpcompression/response_count")
+            respcls = responsetypes.from_args(
+                headers=response.headers, url=response.url, body=decoded_body
+            )
+            kwargs: dict[str, Any] = {"body": decoded_body}
+            if issubclass(respcls, TextResponse):
+                # force recalculating the encoding until we make sure the
+                # responsetypes guessing is reliable
+                kwargs["encoding"] = None
+            response = response.replace(cls=respcls, **kwargs)
+            if not content_encoding:
+                del response.headers["Content-Encoding"]
+        return response
+
+    async def _handle_encoding(
+        self, body: bytes, content_encoding: list[bytes], max_size: int
+    ) -> tuple[bytes, list[bytes]]:
+        to_decode, to_keep = self._split_encodings(content_encoding)
+        if len(to_decode) > self._max_encodings:
+            raise _MaxEncodingCountExceeded(len(to_decode), self._max_encodings)
+        for encoding in to_decode:
+            if len(body) >= _THREAD_DECODE_MIN_SIZE:
+                body = await run_in_thread(self._decode, body, encoding, max_size)
+            else:
+                body = self._decode(body, encoding, max_size)
+        return body, to_keep
+
+    @staticmethod
+    def _split_encodings(
+        content_encoding: list[bytes],
+    ) -> tuple[list[bytes], list[bytes]]:
+        supported_encodings = {*ACCEPTED_ENCODINGS, b"x-gzip"}
+        to_keep: list[bytes] = [
+            encoding.strip().lower()
+            for encoding in chain.from_iterable(
+                encodings.split(b",") for encodings in content_encoding
+            )
+        ]
+        to_decode: list[bytes] = []
+        while to_keep:
+            encoding = to_keep.pop()
+            if encoding not in supported_encodings:
+                to_keep.append(encoding)
+                return to_decode, to_keep
+            to_decode.append(encoding)
+        return to_decode, to_keep
+
+    @staticmethod
+    def _decode(body: bytes, encoding: bytes, max_size: int) -> bytes:
+        if encoding in {b"gzip", b"x-gzip"}:
+            return gunzip(body, max_size=max_size)
+        if encoding == b"deflate":
+            return _inflate(body, max_size=max_size)
+        if encoding == b"br":
+            return _unbrotli(body, max_size=max_size)
+        if encoding == b"zstd":
+            return _unzstd(body, max_size=max_size)
+        # shouldn't be reached
+        return body  # pragma: no cover
+
+    def _warn_unknown_encoding(
+        self, response: Response, encodings: list[bytes]
+    ) -> None:
+        encodings_str = b",".join(encodings).decode()
+        logger.warning(
+            f"{self.__class__.__name__} cannot decode the response for {response.url} "
+            f"from unsupported encoding(s) '{encodings_str}'."
+        )

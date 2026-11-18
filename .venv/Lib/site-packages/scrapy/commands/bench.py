@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+import subprocess
+import sys
+import time
+from typing import TYPE_CHECKING, Any, ClassVar
+from urllib.parse import urlencode
+
+import scrapy
+from scrapy.commands import ScrapyCommand
+from scrapy.http import Response, TextResponse
+from scrapy.linkextractors import LinkExtractor
+from scrapy.utils.test import get_testenv
+
+if TYPE_CHECKING:
+    import argparse
+    from collections.abc import AsyncIterator
+    from types import TracebackType
+
+
+class Command(ScrapyCommand):
+    default_settings: ClassVar[dict[str, Any]] = {
+        "LOG_LEVEL": "INFO",
+        "LOGSTATS_INTERVAL": 1,
+        "CLOSESPIDER_TIMEOUT": 10,
+    }
+
+    def short_desc(self) -> str:
+        return "Run quick benchmark test"
+
+    def run(self, args: list[str], opts: argparse.Namespace) -> None:
+        with _BenchServer() as baseurl:
+            assert self.crawler_process
+            self.crawler_process.crawl(_BenchSpider, total=100000, baseurl=baseurl)
+            self.crawler_process.start()
+
+
+class _BenchServer:
+    def __enter__(self) -> str:
+        pargs = [sys.executable, "-u", "-m", "scrapy.utils._benchserver"]
+        self.proc = subprocess.Popen(  # noqa: S603
+            pargs, stdout=subprocess.PIPE, env=get_testenv()
+        )
+        assert self.proc.stdout
+        # The server listens on a random port and prints it at the end of
+        # its first line.
+        port = int(self.proc.stdout.readline().rsplit(b":", 1)[1])
+        return f"http://localhost:{port}"
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.proc.kill()
+        self.proc.wait()
+        time.sleep(0.2)
+
+
+class _BenchSpider(scrapy.Spider):
+    """A spider that follows all links"""
+
+    name = "follow"
+    total = 10000
+    show = 20
+    baseurl: str
+    link_extractor = LinkExtractor()
+
+    async def start(self) -> AsyncIterator[Any]:
+        qargs = {"total": self.total, "show": self.show}
+        url = f"{self.baseurl}?{urlencode(qargs, doseq=True)}"
+        yield scrapy.Request(url, dont_filter=True)
+
+    def parse(self, response: Response) -> Any:
+        assert isinstance(response, TextResponse)
+        for link in self.link_extractor.extract_links(response):
+            yield scrapy.Request(link.url, callback=self.parse)

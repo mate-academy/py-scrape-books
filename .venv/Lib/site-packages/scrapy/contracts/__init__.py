@@ -1,0 +1,354 @@
+from __future__ import annotations
+
+import re
+import sys
+import warnings
+from collections.abc import AsyncGenerator, Iterable
+from functools import wraps
+from inspect import getmembers, isasyncgenfunction, iscoroutinefunction
+from types import CoroutineType
+from typing import TYPE_CHECKING, Any, ClassVar
+from unittest import TestCase, TestResult
+
+from scrapy.exceptions import ScrapyDeprecationWarning
+from scrapy.http import Request, Response
+from scrapy.utils.asyncgen import collect_asyncgen
+from scrapy.utils.misc import arg_to_iter
+from scrapy.utils.python import get_spec
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+
+    from twisted.python.failure import Failure
+
+    from scrapy import Spider
+
+
+def _is_async(cb: Callable[..., Any]) -> bool:
+    return iscoroutinefunction(cb) or isasyncgenfunction(cb)
+
+
+def _collect(result: Any) -> list[Any]:
+    if isinstance(result, (AsyncGenerator, CoroutineType)):
+        if isinstance(result, CoroutineType):
+            result.close()
+        raise TypeError(
+            "Callbacks that return a coroutine or an asynchronous generator "
+            "must be defined with async def to be supported by contracts."
+        )
+    return list(arg_to_iter(result))
+
+
+async def _collect_async(result: Any) -> list[Any]:
+    if isinstance(result, AsyncGenerator):
+        return await collect_asyncgen(result)
+    if isinstance(result, CoroutineType):
+        return await _collect_async(await result)
+    return list(arg_to_iter(result))
+
+
+def _run_hook(
+    process: Callable[[Any], None],
+    value: Any,
+    testcase: TestCase,
+    results: TestResult,
+) -> None:
+    try:
+        results.startTest(testcase)
+        process(value)
+    except AssertionError:
+        results.addFailure(testcase, sys.exc_info())
+    except Exception:
+        results.addError(testcase, sys.exc_info())
+    else:
+        results.addSuccess(testcase)
+    finally:
+        results.stopTest(testcase)
+
+
+class Contract:
+    """Base class for :ref:`custom contracts <topics-contracts>`.
+
+    *method* is the callback function to which the contract is associated.
+
+    *args* is the list of arguments passed into the docstring, separated by
+    whitespace.
+
+    Subclasses may override :meth:`adjust_request_args`, and define a
+    ``pre_process`` method or a ``post_process`` method, or both.
+    """
+
+    request_cls: type[Request] | None = None
+    generates_request: ClassVar[bool] = False
+    """Whether each usage of this contract in a batch produces its own
+    sample request, instead of adjusting a single, shared one.
+
+    :class:`~scrapy.contracts.default.UrlContract` is the only built-in
+    contract that sets this to ``True``, which is what allows a batch to
+    include more than one ``@url`` line.
+    """
+    name: str
+
+    def __init__(self, method: Callable[..., Any], *args: str):
+        self.testcase_pre = _create_testcase(method, f"@{self.name} pre-hook")
+        self.testcase_post = _create_testcase(method, f"@{self.name} post-hook")
+        self.args: tuple[str, ...] = args
+
+    def add_pre_hook(self, request: Request, results: TestResult) -> Request:
+        if hasattr(self, "pre_process"):
+            cb = request.callback
+            assert cb is not None
+            pre_process = self.pre_process
+            testcase = self.testcase_pre
+
+            if _is_async(cb):
+
+                @wraps(cb)
+                async def async_wrapper(
+                    response: Response, **cb_kwargs: Any
+                ) -> list[Any]:
+                    _run_hook(pre_process, response, testcase, results)
+                    return await _collect_async(cb(response, **cb_kwargs))
+
+                request.callback = async_wrapper
+            else:
+
+                @wraps(cb)
+                def wrapper(response: Response, **cb_kwargs: Any) -> list[Any]:
+                    _run_hook(pre_process, response, testcase, results)
+                    return _collect(cb(response, **cb_kwargs))
+
+                request.callback = wrapper
+
+        return request
+
+    def add_post_hook(self, request: Request, results: TestResult) -> Request:
+        if hasattr(self, "post_process"):
+            cb = request.callback
+            assert cb is not None
+            post_process = self.post_process
+            testcase = self.testcase_post
+
+            if _is_async(cb):
+
+                @wraps(cb)
+                async def async_wrapper(
+                    response: Response, **cb_kwargs: Any
+                ) -> list[Any]:
+                    output = await _collect_async(cb(response, **cb_kwargs))
+                    _run_hook(post_process, output, testcase, results)
+                    return output
+
+                request.callback = async_wrapper
+            else:
+
+                @wraps(cb)
+                def wrapper(response: Response, **cb_kwargs: Any) -> list[Any]:
+                    output = _collect(cb(response, **cb_kwargs))
+                    _run_hook(post_process, output, testcase, results)
+                    return output
+
+                request.callback = wrapper
+
+        return request
+
+    def adjust_request_args(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Receive a ``dict`` with the default arguments for the sample request
+        and return it, either unmodified or with changes.
+
+        :class:`~scrapy.Request` is used by default, but this can be changed
+        with the ``request_cls`` attribute. If multiple contracts in the chain
+        define this attribute, the last one is used.
+        """
+        return args
+
+
+class ContractsManager:
+    contracts: ClassVar[dict[str, type[Contract]]] = {}
+
+    def __init__(self, contracts: Iterable[type[Contract]]):
+        for contract in contracts:
+            if (
+                contract.add_pre_hook is not Contract.add_pre_hook
+                or contract.add_post_hook is not Contract.add_post_hook
+            ):
+                warnings.warn(
+                    f"{contract.__module__}.{contract.__qualname__} overrides"
+                    " Contract.add_pre_hook() or Contract.add_post_hook(), which is"
+                    " deprecated. Define pre_process() or post_process() instead."
+                    " Contracts that override those methods do not support"
+                    " asynchronous callbacks.",
+                    ScrapyDeprecationWarning,
+                    stacklevel=2,
+                )
+            self.contracts[contract.name] = contract
+
+    def _iter_contract_batches(self, docstring: str) -> Iterator[list[tuple[str, str]]]:
+        """Yield the ``(name, args)`` pairs of the lines of *docstring* that
+        declare a registered contract, grouped into batches, one per blank line
+        found after the first contract line.
+
+        Lines that start with ``@`` but do not name a registered contract are
+        ignored, so that docstrings may include unrelated content such as
+        decorators in code examples.
+        """
+        batch: list[tuple[str, str]] = []
+        for line_ in docstring.split("\n"):
+            line = line_.strip()
+            if not line:
+                if batch:
+                    yield batch
+                    batch = []
+                continue
+            if not line.startswith("@"):
+                continue
+            m = re.match(r"@(\w+)\s*(.*)", line)
+            if m is None:
+                continue
+            name, args = m.groups()
+            if name in self.contracts:
+                batch.append((name, args))
+        if batch:
+            yield batch
+
+    def tested_methods_from_spidercls(self, spidercls: type[Spider]) -> list[str]:
+        return [
+            key
+            for key, value in getmembers(spidercls)
+            if callable(value)
+            and value.__doc__
+            and any(self._iter_contract_batches(value.__doc__))
+        ]
+
+    def extract_contracts(self, method: Callable[..., Any]) -> list[list[Contract]]:
+        """Group the contracts of a callback docstring into batches, one per
+        blank line found after the first contract line.
+        """
+        assert method.__doc__ is not None
+        return [
+            [
+                self.contracts[name](method, *re.split(r"\s+", args))
+                for name, args in batch
+            ]
+            for batch in self._iter_contract_batches(method.__doc__)
+        ]
+
+    def from_spider(self, spider: Spider, results: TestResult) -> list[Request]:
+        requests: list[Request] = []
+        for method in self.tested_methods_from_spidercls(type(spider)):
+            bound_method = getattr(spider, method)
+            try:
+                requests.extend(self.from_method(bound_method, results))
+            except Exception:
+                case = _create_testcase(bound_method, "contract")
+                results.addError(case, sys.exc_info())
+
+        return requests
+
+    def from_method(
+        self, method: Callable[..., Any], results: TestResult
+    ) -> list[Request]:
+        requests: list[Request] = []
+        for batch in self.extract_contracts(method):
+            requests.extend(self._requests_from_batch(batch, method, results))
+        return requests
+
+    def _requests_from_batch(
+        self,
+        contracts: list[Contract],
+        method: Callable[..., Any],
+        results: TestResult,
+    ) -> list[Request]:
+        request_cls = Request
+        for contract in contracts:
+            if contract.request_cls is not None:
+                request_cls = contract.request_cls
+
+        # calculate request args
+        arg_names, base_kwargs = get_spec(request_cls.__init__)
+        arg_names.remove("self")
+
+        # Don't filter requests to allow
+        # testing different callbacks on the same URL.
+        base_kwargs["dont_filter"] = True
+        base_kwargs["callback"] = method
+
+        # Contracts that opt into generating their own request (@url) each
+        # get their own request, built from every other contract in the
+        # batch; other batches only ever build a single, shared request.
+        generators = [contract for contract in contracts if contract.generates_request]
+
+        candidates: list[Contract | None] = list(generators) if generators else [None]
+
+        requests = []
+        for candidate in candidates:
+            kwargs = dict(base_kwargs)
+            for contract in contracts:
+                if contract in generators and contract is not candidate:
+                    continue
+                kwargs = contract.adjust_request_args(kwargs)
+
+            # check if all positional arguments are defined in kwargs
+            if not set(arg_names).issubset(set(kwargs)):
+                continue
+
+            request = request_cls(**kwargs)
+
+            # execute pre and post hooks in order
+            for contract in reversed(contracts):
+                request = contract.add_pre_hook(request, results)
+            for contract in contracts:
+                request = contract.add_post_hook(request, results)
+
+            self._clean_req(request, method, results)
+            requests.append(request)
+
+        return requests
+
+    def _clean_req(
+        self, request: Request, method: Callable[..., Any], results: TestResult
+    ) -> None:
+        """stop the request from returning objects and records any errors"""
+
+        cb = request.callback
+        assert cb is not None
+
+        if _is_async(cb):
+
+            @wraps(cb)
+            async def cb_wrapper(response: Response, **cb_kwargs: Any) -> None:
+                try:
+                    await _collect_async(cb(response, **cb_kwargs))
+                except Exception:
+                    case = _create_testcase(method, "callback")
+                    results.addError(case, sys.exc_info())
+
+        else:
+
+            @wraps(cb)
+            def cb_wrapper(response: Response, **cb_kwargs: Any) -> None:
+                try:
+                    _collect(cb(response, **cb_kwargs))
+                except Exception:
+                    case = _create_testcase(method, "callback")
+                    results.addError(case, sys.exc_info())
+
+        def eb_wrapper(failure: Failure) -> None:
+            case = _create_testcase(method, "errback")
+            exc_info = failure.type, failure.value, failure.getTracebackObject()
+            results.addError(case, exc_info)  # type: ignore[arg-type]
+
+        request.callback = cb_wrapper
+        request.errback = eb_wrapper
+
+
+def _create_testcase(method: Callable[..., Any], desc: str) -> TestCase:
+    spider = method.__self__.name  # type: ignore[attr-defined]
+
+    class ContractTestCase(TestCase):
+        def __str__(_self) -> str:  # pylint: disable=no-self-argument
+            return f"[{spider}] {method.__name__} ({desc})"
+
+    name = f"{spider}_{method.__name__}"
+    setattr(ContractTestCase, name, lambda x: x)
+    return ContractTestCase(name)

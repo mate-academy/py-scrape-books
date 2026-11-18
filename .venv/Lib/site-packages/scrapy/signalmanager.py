@@ -1,0 +1,175 @@
+from __future__ import annotations
+
+import inspect
+import warnings
+from contextlib import nullcontext
+from typing import TYPE_CHECKING, Any
+
+from pydispatch import dispatcher
+from twisted.internet.defer import Deferred
+
+from scrapy import signals
+from scrapy.exceptions import ScrapyDeprecationWarning
+from scrapy.http.request import _active_crawler_scope
+from scrapy.utils import signal as _signal
+from scrapy.utils.defer import maybe_deferred_to_future
+from scrapy.utils.python import global_object_name
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+class SignalManager:
+    def __init__(self, sender: object = dispatcher.Anonymous):
+        self.sender: object = sender
+
+    def connect(
+        self, receiver: Callable[..., Any], signal: object, **kwargs: Any
+    ) -> None:
+        """
+        Connect a receiver function to a signal.
+
+        The signal can be any object, although Scrapy comes with some
+        predefined signals that are documented in the :ref:`topics-signals`
+        section.
+
+        :param receiver: the function to be connected
+        :type receiver: collections.abc.Callable
+
+        :param signal: the signal to connect to
+        :type signal: object
+        """
+        _warn_unknown_args(receiver, signal)
+        kwargs.setdefault("sender", self.sender)
+        dispatcher.connect(receiver, signal, **kwargs)
+
+    def disconnect(
+        self, receiver: Callable[..., Any], signal: object, **kwargs: Any
+    ) -> None:
+        """
+        Disconnect a receiver function from a signal. This has the
+        opposite effect of the :meth:`connect` method, and the arguments
+        are the same.
+        """
+        kwargs.setdefault("sender", self.sender)
+        dispatcher.disconnect(receiver, signal, **kwargs)
+
+    def send_catch_log(
+        self, signal: object, **kwargs: Any
+    ) -> list[tuple[Callable[..., Any], Any]]:
+        """
+        Send a signal, catch exceptions and log them.
+
+        The keyword arguments are passed to the signal handlers (connected
+        through the :meth:`connect` method).
+        """
+        kwargs.setdefault("sender", self.sender)
+        return _signal.send_catch_log(signal, **kwargs)
+
+    def send_catch_log_deferred(
+        self, signal: object, **kwargs: Any
+    ) -> Deferred[list[tuple[Callable[..., Any], Any]]]:  # pragma: no cover
+        """
+        Like :meth:`send_catch_log` but supports :ref:`asynchronous signal
+        handlers <signal-deferred>`.
+
+        Returns a Deferred that gets fired once all signal handlers
+        have finished. Send a signal, catch exceptions and log them.
+
+        The keyword arguments are passed to the signal handlers (connected
+        through the :meth:`connect` method).
+        """
+        kwargs.setdefault("sender", self.sender)
+        warnings.warn(
+            "send_catch_log_deferred() is deprecated, use send_catch_log_async() instead",
+            ScrapyDeprecationWarning,
+            stacklevel=2,
+        )
+        return _signal._send_catch_log_deferred(signal, **kwargs)
+
+    async def send_catch_log_async(
+        self, signal: object, **kwargs: Any
+    ) -> list[tuple[Callable[..., Any], Any]]:
+        """
+        Like :meth:`send_catch_log` but supports :ref:`asynchronous signal
+        handlers <signal-deferred>`.
+
+        Returns a coroutine that completes once all signal handlers
+        have finished. Send a signal, catch exceptions and log them.
+
+        The keyword arguments are passed to the signal handlers (connected
+        through the :meth:`connect` method).
+
+        .. versionadded:: 2.14
+        """
+        # note that this returns exceptions instead of Failures in the second tuple member
+        kwargs.setdefault("sender", self.sender)
+
+        # circular import
+        from scrapy.crawler import Crawler  # noqa: PLC0415
+
+        # Lets Request.__await__() find the crawler while the signal handlers
+        # run. The sender is only a crawler for signal managers that Scrapy
+        # creates.
+        scope = (
+            _active_crawler_scope(self.sender)
+            if isinstance(self.sender, Crawler)
+            else nullcontext()
+        )
+        with scope:
+            return await _signal.send_catch_log_async(signal, **kwargs)
+
+    def disconnect_all(self, signal: object, **kwargs: Any) -> None:
+        """
+        Disconnect all receivers from the given signal.
+
+        :param signal: the signal to disconnect from
+        :type signal: object
+        """
+        kwargs.setdefault("sender", self.sender)
+        _signal.disconnect_all(signal, **kwargs)
+
+    async def wait_for(self, signal: object) -> None:
+        """Await the next *signal*.
+
+        See :ref:`start-requests-lazy` for an example.
+        """
+        d: Deferred[None] = Deferred()
+
+        def handle() -> None:
+            self.disconnect(handle, signal)
+            d.callback(None)
+
+        self.connect(handle, signal)
+        await maybe_deferred_to_future(d)
+
+
+def _warn_unknown_args(receiver: Callable[..., Any], signal: object) -> None:
+    sent = signals._signal_args.get(signal)
+    if sent is None:
+        return
+    try:
+        parameters = inspect.signature(receiver).parameters.values()
+    except (TypeError, ValueError):
+        return
+    if any(p.kind is p.VAR_KEYWORD for p in parameters):
+        return
+    unknown = {
+        p.name
+        for p in parameters
+        if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)
+        and p.name not in sent
+        and p.name not in {"signal", "sender"}
+    }
+    if not unknown:
+        return
+    try:
+        receiver_name = global_object_name(receiver)
+    except AttributeError:
+        receiver_name = repr(receiver)
+    signal_name = next(k for k, v in vars(signals).items() if v is signal)
+    warnings.warn(
+        f"Signal handler {receiver_name} declares {', '.join(sorted(unknown))},"
+        f" which scrapy.signals.{signal_name} does not send.",
+        stacklevel=3,
+    )

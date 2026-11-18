@@ -1,0 +1,358 @@
+"""
+Base class for Scrapy commands
+"""
+
+from __future__ import annotations
+
+import argparse
+import builtins
+import logging
+import os
+import sys
+import warnings
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, ClassVar
+
+from scrapy import signals
+from scrapy.exceptions import ScrapyDeprecationWarning, UsageError
+from scrapy.extensions.feedexport import FeedExporter
+from scrapy.http import Request
+from scrapy.spiderloader import get_spider_loader
+from scrapy.utils.conf import arglist_to_dict, feed_process_params_from_cli
+from scrapy.utils.deprecate import method_is_overridden
+from scrapy.utils.python import global_object_name
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from scrapy import Spider
+    from scrapy.crawler import Crawler, CrawlerProcessBase
+    from scrapy.settings import Settings
+
+
+logger = logging.getLogger(__name__)
+
+
+def _add_curl_option(parser: argparse.ArgumentParser) -> None:
+    """Register the ``--curl`` option on commands that accept a URL."""
+    parser.add_argument(
+        "--curl",
+        metavar="COMMAND",
+        default=None,
+        help="build the request from a curl command, e.g. "
+        "--curl 'curl -d a=1 https://example.com'; cannot be combined "
+        "with a URL argument",
+    )
+
+
+def _request_from_curl(curl_command: str, **kwargs: Any) -> Request:
+    """Build a :class:`~scrapy.Request` from a curl command, reporting parsing
+    errors as :exc:`~scrapy.exceptions.UsageError`."""
+    try:
+        return Request.from_curl(curl_command, **kwargs)
+    except ValueError as e:
+        raise UsageError(str(e), print_help=False) from e
+
+
+class _PdbHandler(logging.Handler):
+    """Start a post-mortem debugging session on every logged record that comes
+    with an exception traceback."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.exc_info and record.exc_info[2]:
+            import pdb  # noqa: T100,PLC0415
+
+            pdb.post_mortem(record.exc_info[2])
+
+
+class ScrapyCommand(ABC):
+    """Base class for all Scrapy commands."""
+
+    requires_project: bool = False
+    requires_crawler_process: bool = True
+    crawler_process: CrawlerProcessBase | None = None  # set in scrapy.cmdline
+
+    # default settings to be used for this command instead of global defaults
+    default_settings: ClassVar[dict[str, Any]] = {}
+
+    exitcode: int = 0
+
+    def __init__(self) -> None:
+        self.settings: Settings | None = None  # set in scrapy.cmdline
+        if method_is_overridden(self.__class__, ScrapyCommand, "help"):
+            warnings.warn(
+                "The ScrapyCommand.help() method is deprecated and overriding "
+                f"it, as the {global_object_name(self.__class__)} class does, "
+                "has no effect; override long_desc() instead.",
+                ScrapyDeprecationWarning,
+                stacklevel=2,
+            )
+
+    def set_crawler(self, crawler: Crawler) -> None:  # pragma: no cover
+        warnings.warn(
+            "ScrapyCommand.set_crawler() is deprecated",
+            ScrapyDeprecationWarning,
+            stacklevel=2,
+        )
+        if hasattr(self, "_crawler"):
+            raise RuntimeError("crawler already set")
+        self._crawler: Crawler = crawler
+
+    def syntax(self) -> str:
+        """Command syntax (preferably one-line). Do not include command name."""
+        return ""
+
+    @abstractmethod
+    def short_desc(self) -> str:
+        """A short description of the command."""
+        return ""
+
+    def long_desc(self) -> str:
+        """A long description of the command. Return short description when not
+        available. It cannot contain newlines since contents will be formatted
+        by argparse which removes newlines and wraps text.
+        """
+        return self.short_desc()
+
+    def help(self) -> str:
+        warnings.warn(
+            "ScrapyCommand.help() is deprecated, use long_desc() instead.",
+            ScrapyDeprecationWarning,
+            stacklevel=2,
+        )
+        return self.long_desc()
+
+    def add_options(self, parser: argparse.ArgumentParser) -> None:
+        """Populate the option parser with the options available for this command."""
+        assert self.settings is not None
+        group = parser.add_argument_group(title="Global Options")
+        group.add_argument(
+            "--logfile", metavar="FILE", help="log file. if omitted stderr will be used"
+        )
+        group.add_argument(
+            "-L",
+            "--loglevel",
+            metavar="LEVEL",
+            default=None,
+            help=f"log level (default: {self.settings['LOG_LEVEL']})",
+        )
+        group.add_argument(
+            "--nolog", action="store_true", help="disable logging completely"
+        )
+        group.add_argument(
+            "--profile",
+            metavar="FILE",
+            default=None,
+            help="write python cProfile stats to FILE",
+        )
+        group.add_argument("--pidfile", metavar="FILE", help="write process ID to FILE")
+        group.add_argument(
+            "-s",
+            "--set",
+            action="append",
+            default=[],
+            metavar="NAME=VALUE",
+            help="set/override setting (may be repeated)",
+        )
+        group.add_argument(
+            "--pdb",
+            action="store_true",
+            help="enable pdb on failure (uses ipdb if installed)",
+        )
+
+    def complete_argument(self, args: list[str]) -> Iterable[str]:
+        """Return shell completion candidates for the positional argument
+        being typed, where *args* are the positional arguments typed before
+        it.
+
+        .. versionadded:: 2.20.0
+
+        See :ref:`completion`.
+        """
+        return ()
+
+    def complete_option(self, dest: str) -> Iterable[str]:
+        """Return shell completion candidates for the value of the option
+        being typed, identified by *dest*, i.e. the name under which its value
+        is available in the ``opts`` parameter of ``run()``.
+
+        .. versionadded:: 2.20.0
+
+        See :ref:`completion`.
+        """
+        if dest == "loglevel":
+            return ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
+        return ()
+
+    def _spider_names(self) -> list[str]:
+        assert self.settings is not None
+        try:
+            return sorted(get_spider_loader(self.settings).list())
+        except Exception:
+            # Completion runs on incomplete command lines and outside
+            # projects, where loading spiders is expected to fail.
+            return []
+
+    def process_options(self, args: list[str], opts: argparse.Namespace) -> None:
+        """Set settings based on the command line options."""
+        assert self.settings is not None
+        try:
+            self.settings.setdict(arglist_to_dict(opts.set), priority="cmdline")
+        except ValueError:
+            raise UsageError(
+                "Invalid -s value, use -s NAME=VALUE", print_help=False
+            ) from None
+
+        if opts.logfile:
+            self.settings.set("LOG_ENABLED", True, priority="cmdline")
+            self.settings.set("LOG_FILE", opts.logfile, priority="cmdline")
+
+        if opts.loglevel:
+            self.settings.set("LOG_ENABLED", True, priority="cmdline")
+            self.settings.set("LOG_LEVEL", opts.loglevel, priority="cmdline")
+
+        if opts.nolog:
+            self.settings.set("LOG_ENABLED", False, priority="cmdline")
+
+        if opts.pidfile:
+            Path(opts.pidfile).write_text(
+                str(os.getpid()) + os.linesep, encoding="utf-8"
+            )
+
+        if opts.pdb:
+            try:
+                import ipdb  # noqa: T100,PLC0415
+            except ImportError:
+                pass
+            else:
+                sys.modules["pdb"] = ipdb
+            logging.root.addHandler(_PdbHandler(level=logging.ERROR))
+
+    @abstractmethod
+    def run(self, args: list[str], opts: argparse.Namespace) -> None:
+        """Entry point for running commands."""
+        raise NotImplementedError
+
+
+class BaseRunSpiderCommand(ScrapyCommand, ABC):
+    """
+    Common class used to share functionality between the crawl, parse and runspider commands
+    """
+
+    def add_options(self, parser: argparse.ArgumentParser) -> None:
+        super().add_options(parser)
+        parser.add_argument(
+            "-a",
+            dest="spargs",
+            action="append",
+            default=[],
+            metavar="NAME=VALUE",
+            help="set spider argument (may be repeated)",
+        )
+        parser.add_argument(
+            "-o",
+            "--output",
+            metavar="FILE",
+            action="append",
+            help="append scraped items to the end of FILE (use - for stdout),"
+            " to define format set a colon at the end of the output URI (i.e. -o FILE:FORMAT)",
+        )
+        parser.add_argument(
+            "-O",
+            "--overwrite-output",
+            metavar="FILE",
+            action="append",
+            help="dump scraped items into FILE, overwriting any existing file,"
+            " to define format set a colon at the end of the output URI (i.e. -O FILE:FORMAT)",
+        )
+
+    def process_options(self, args: list[str], opts: argparse.Namespace) -> None:
+        super().process_options(args, opts)
+        try:
+            opts.spargs = arglist_to_dict(opts.spargs)
+        except ValueError:
+            raise UsageError(
+                "Invalid -a value, use -a NAME=VALUE", print_help=False
+            ) from None
+        if opts.output or opts.overwrite_output:
+            assert self.settings is not None
+            feeds = feed_process_params_from_cli(
+                self.settings,
+                opts.output,
+                overwrite_output=opts.overwrite_output,
+            )
+            self.settings.set("FEEDS", feeds, priority="cmdline")
+
+    def _create_crawler(self, spidercls: type[Spider] | str) -> Crawler:
+        assert self.crawler_process is not None
+        crawler = self.crawler_process.create_crawler(spidercls)
+        crawler.signals.connect(
+            self._warn_if_feeds_unused, signal=signals.engine_started
+        )
+        return crawler
+
+    def _run_crawler(
+        self, spidercls: type[Spider] | str, opts: argparse.Namespace
+    ) -> None:
+        assert self.crawler_process is not None
+        crawler = self._create_crawler(spidercls)
+        self.crawler_process.crawl(crawler, **opts.spargs)
+        self.crawler_process.start()
+        if self.crawler_process.bootstrap_failed or crawler.stats.get_value(
+            "finish_reason_error", False
+        ):
+            self.exitcode = 1
+
+    def _warn_if_feeds_unused(self, sender: Crawler, **kwargs: Any) -> None:
+        if (
+            sender.settings.getdict("FEEDS")
+            and sender.get_extension(FeedExporter) is None
+        ):
+            logger.warning(
+                "The FeedExporter extension is not enabled, so no item will be "
+                "exported to the configured feeds (FEEDS, -o, -O)."
+            )
+
+
+class ScrapyHelpFormatter(argparse.HelpFormatter):
+    """
+    Help Formatter for scrapy command line help messages.
+    """
+
+    def __init__(
+        self,
+        prog: str,
+        indent_increment: int = 2,
+        max_help_position: int = 24,
+        width: int | None = None,
+    ):
+        super().__init__(
+            prog,
+            indent_increment=indent_increment,
+            max_help_position=max_help_position,
+            width=width,
+        )
+
+    def _join_parts(self, part_strings: Iterable[str]) -> str:
+        # scrapy.commands.list shadows builtins.list
+        parts = self.format_part_strings(builtins.list(part_strings))
+        return super()._join_parts(parts)
+
+    def format_part_strings(self, part_strings: list[str]) -> list[str]:
+        """
+        Underline and title case command line help message headers.
+        """
+        if part_strings and part_strings[0].startswith("usage: "):
+            part_strings[0] = "Usage\n=====\n  " + part_strings[0].removeprefix(
+                "usage: "
+            )
+        headings = [
+            i for i in range(len(part_strings)) if part_strings[i].endswith(":\n")
+        ]
+        for index in reversed(headings):
+            char = "-" if "Global Options" in part_strings[index] else "="
+            part_strings[index] = part_strings[index].removesuffix(":\n").title()
+            underline = "".join(["\n", (char * len(part_strings[index])), "\n"])
+            part_strings.insert(index + 1, underline)
+        return part_strings

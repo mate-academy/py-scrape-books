@@ -1,0 +1,431 @@
+"""
+This module implements the TextResponse class which adds encoding handling and
+discovering (through HTTP headers) to base Response class.
+
+See documentation in docs/topics/request-response.rst
+"""
+
+from __future__ import annotations
+
+import json
+import warnings
+import weakref
+from contextlib import suppress
+from dataclasses import dataclass
+from enum import Enum, auto
+from typing import TYPE_CHECKING, Any, Literal, cast
+from urllib.parse import urljoin
+
+import frostwork
+import parsel
+from w3lib.encoding import (
+    html_body_declared_encoding,
+    html_encoding,
+    html_to_unicode,
+    http_content_type_encoding,
+    read_bom,
+    resolve_encoding,
+)
+from w3lib.html import strip_html5_whitespace
+
+from scrapy.exceptions import ScrapyDeprecationWarning
+from scrapy.http.response import Response
+from scrapy.utils.python import memoizemethod_noargs
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Mapping
+
+    from twisted.python.failure import Failure
+
+    from scrapy.http.request import CallbackT, CookiesT, Request
+    from scrapy.link import Link
+    from scrapy.selector import Selector, SelectorList
+
+
+class _Unset(Enum):
+    UNSET = auto()
+
+
+_UNSET = _Unset.UNSET
+
+
+@dataclass(frozen=True)
+class MetaRefresh:
+    """Meta refresh of a :class:`~scrapy.http.TextResponse`, as
+    :attr:`TextResponse.meta_refresh <scrapy.http.TextResponse.meta_refresh>`
+    reports it.
+
+    .. versionadded:: 2.20.0
+    """
+
+    delay: float
+    """Seconds to wait before the refresh."""
+
+    url: str
+    """Absolute URL to load."""
+
+
+def _is_browser_encoding(encoding: str) -> bool:
+    resolved = resolve_encoding(encoding)
+    # "replacement" is what response.encoding reports for labels that browsers
+    # decode as a single U+FFFD, e.g. a Content-Type charset of hz.
+    return resolved is not None and (
+        resolved != "replacement" or encoding == "replacement"
+    )
+
+
+class TextResponse(Response):
+    attributes: tuple[str, ...] = (*Response.attributes, "encoding")
+    __slots__ = (
+        "_base_url",
+        "_cached_benc",
+        "_cached_decoded_json",
+        "_cached_selector",
+        "_cached_ubody",
+        "_encoding",
+        "_meta_refresh",
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        self._encoding: str | None = kwargs.pop("encoding", None)
+        if self._encoding is not None and not _is_browser_encoding(self._encoding):
+            warnings.warn(
+                f"Passing encoding={self._encoding!r} to {type(self).__name__} "
+                f"is deprecated, because web browsers do not support that "
+                f"encoding, and it will raise ValueError in a future version "
+                f"of Scrapy. To decode the response body with it, use "
+                f"response.body.decode({self._encoding!r}) instead.",
+                ScrapyDeprecationWarning,
+                stacklevel=2,
+            )
+        self._cached_benc: str | None = None
+        self._cached_ubody: str | None = None
+        self._cached_selector: Selector | None = None
+        self._cached_decoded_json: object = _UNSET
+        self._base_url: str | None = None
+        self._meta_refresh: MetaRefresh | Literal[_Unset.UNSET] | None = _UNSET
+        super().__init__(*args, **kwargs)
+
+    def _set_body(self, body: str | bytes | None) -> None:
+        self._body: bytes = b""  # used by encoding detection
+        if isinstance(body, str):
+            if self._encoding is None:
+                raise TypeError(
+                    "Cannot convert unicode body - "
+                    f"{type(self).__name__} has no encoding"
+                )
+            self._body = body.encode(self._encoding)
+            # Keep body as text only if decoding _body gives it back
+            # unchanged. html_to_unicode() may resolve the encoding to
+            # another codec (e.g. latin-1 to cp1252) and strips a BOM.
+            if resolve_encoding(self._encoding) == "utf-8" and not body.startswith(
+                "\ufeff"
+            ):
+                self._cached_ubody = body
+        else:
+            super()._set_body(body)
+
+    @property
+    def encoding(self) -> str:
+        return self._declared_encoding() or self._body_inferred_encoding()
+
+    def _declared_encoding(self) -> str | None:
+        return (
+            self._encoding
+            or self._bom_encoding()
+            or self._headers_encoding()
+            or self._body_declared_encoding()
+        )
+
+    def json(self) -> Any:
+        """Deserialize a JSON document to a Python object.
+
+        .. versionchanged:: 2.18.0
+           Bodies that cannot be decoded as UTF-8, UTF-16 or UTF-32, as the
+           JSON specification requires, are now decoded using
+           :attr:`TextResponse.encoding` instead of raising
+           :exc:`UnicodeDecodeError`.
+
+        The result is cached after the first call.
+        """
+        if self._cached_decoded_json is _UNSET:
+            try:
+                self._cached_decoded_json = json.loads(self.body)
+            except UnicodeDecodeError:
+                self._cached_decoded_json = json.loads(self.text)
+        return self._cached_decoded_json
+
+    @property
+    def text(self) -> str:
+        """Body as unicode"""
+        if self._cached_ubody is None:
+            if (
+                self._encoding is not None
+                and not _is_browser_encoding(self._encoding)
+                and not self._bom_encoding()
+            ):
+                with suppress(LookupError):
+                    self._cached_ubody = self.body.decode(self._encoding, "replace")
+            if self._cached_ubody is None:
+                charset = f"charset={self.encoding}"
+                self._cached_ubody = html_to_unicode(charset, self.body)[1]
+        return self._cached_ubody
+
+    def urljoin(self, url: str) -> str:
+        """Join this Response's url with a possible relative url to form an
+        absolute interpretation of the latter."""
+        return urljoin(self.base_url, url)
+
+    @property
+    def base_url(self) -> str:
+        """Absolute URL that relative URLs of the response are relative to.
+
+        .. versionadded:: 2.20.0
+
+        It is the ``href`` of the first ``<base>`` element that has one,
+        resolved against :attr:`~Response.url`, or :attr:`~Response.url`
+        itself, serialized like a web browser does, e.g. with ``/`` as empty
+        path. Setting it overrides the value read from the body.
+        """
+        if self._base_url is None:
+            self._read_html_metadata()
+        assert self._base_url is not None
+        return self._base_url
+
+    @base_url.setter
+    def base_url(self, value: str) -> None:
+        self._base_url = value
+
+    @property
+    def meta_refresh(self) -> MetaRefresh | None:
+        """:class:`~scrapy.http.response.text.MetaRefresh` that a web browser
+        with JavaScript enabled would follow, or ``None``.
+
+        .. versionadded:: 2.20.0
+
+        Setting it overrides the value read from the body.
+        """
+        if self._meta_refresh is _UNSET:
+            self._read_html_metadata()
+        assert self._meta_refresh is not _UNSET
+        return self._meta_refresh
+
+    @meta_refresh.setter
+    def meta_refresh(self, value: MetaRefresh | tuple[float, str] | None) -> None:
+        if value is None or isinstance(value, MetaRefresh):
+            self._meta_refresh = value
+        else:
+            self._meta_refresh = MetaRefresh(*value)
+
+    def _read_html_metadata(self) -> None:
+        metadata = frostwork.navigation(
+            self.body,
+            self.url,
+            self.encoding,
+            base_url=self._base_url is None,
+            meta_refresh=self._meta_refresh is _UNSET,
+        )
+        if self._base_url is None:
+            self._base_url = metadata.base_url
+        if self._meta_refresh is _UNSET:
+            self.meta_refresh = metadata.meta_refresh
+
+    @memoizemethod_noargs
+    def _headers_encoding(self) -> str | None:
+        content_type = self.headers.get(b"Content-Type") or b""
+        return http_content_type_encoding(content_type.decode("latin-1"))
+
+    def _body_inferred_encoding(self) -> str:
+        if self._cached_benc is None:
+            content_type = self.headers.get(b"Content-Type") or b""
+            self._cached_benc = html_encoding(
+                content_type.decode("latin-1"), self.body, url=self.url
+            )
+        return self._cached_benc
+
+    @memoizemethod_noargs
+    def _body_declared_encoding(self) -> str | None:
+        return html_body_declared_encoding(self.body)
+
+    @memoizemethod_noargs
+    def _bom_encoding(self) -> str | None:
+        return read_bom(self.body)[0]
+
+    @property
+    def selector(self) -> Selector:
+        if self._cached_selector is None:
+            # circular import
+            from scrapy.selector import Selector  # noqa: PLC0415
+
+            selector = Selector(self)
+            # The weak reference lets the response be freed as soon as nothing
+            # else refers to it.
+            selector._response = weakref.ref(self)
+            self._cached_selector = selector
+        return self._cached_selector
+
+    def jmespath(self, query: str, **kwargs: Any) -> SelectorList:
+        return cast("SelectorList", self.selector.jmespath(query, **kwargs))
+
+    def xpath(self, query: str, **kwargs: Any) -> SelectorList:
+        return cast("SelectorList", self.selector.xpath(query, **kwargs))
+
+    def css(self, query: str) -> SelectorList:
+        return cast("SelectorList", self.selector.css(query))
+
+    def follow(
+        self,
+        url: str | Link | parsel.Selector,
+        callback: CallbackT | None = None,
+        method: str = "GET",
+        headers: Mapping[str, Any]
+        | Mapping[bytes, Any]
+        | Iterable[tuple[str | bytes, Any]]
+        | None = None,
+        body: bytes | str | None = None,
+        cookies: CookiesT | None = None,
+        meta: dict[str, Any] | None = None,
+        encoding: str | None = None,
+        priority: int = 0,
+        dont_filter: bool = False,
+        errback: Callable[[Failure], Any] | None = None,
+        cb_kwargs: dict[str, Any] | None = None,
+        flags: list[str] | None = None,
+    ) -> Request:
+        """
+        Return a :class:`~.Request` instance to follow a link ``url``.
+        It accepts the same arguments as ``Request.__init__()`` method,
+        but ``url`` can be not only an absolute URL, but also
+
+        * a relative URL
+        * a :class:`~scrapy.link.Link` object, e.g. the result of
+          :ref:`topics-link-extractors`
+        * a :class:`~scrapy.Selector` object for a ``<link>`` or ``<a>`` element, e.g.
+          ``response.css('a.my_link')[0]``
+        * an attribute :class:`~scrapy.Selector` (not SelectorList), e.g.
+          ``response.css('a::attr(href)')[0]`` or
+          ``response.xpath('//img/@src')[0]``
+
+        See :ref:`response-follow-example` for usage examples.
+        """
+        if isinstance(url, parsel.Selector):
+            url = _url_from_selector(url)
+        elif isinstance(url, parsel.SelectorList):
+            raise ValueError("SelectorList is not supported")
+        encoding = self.encoding if encoding is None else encoding
+        return super().follow(
+            url=url,
+            callback=callback,
+            method=method,
+            headers=headers,
+            body=body,
+            cookies=cookies,
+            meta=meta,
+            encoding=encoding,
+            priority=priority,
+            dont_filter=dont_filter,
+            errback=errback,
+            cb_kwargs=cb_kwargs,
+            flags=flags,
+        )
+
+    def follow_all(
+        self,
+        urls: Iterable[str | Link] | parsel.SelectorList[Any] | None = None,
+        callback: CallbackT | None = None,
+        method: str = "GET",
+        headers: Mapping[str, Any]
+        | Mapping[bytes, Any]
+        | Iterable[tuple[str | bytes, Any]]
+        | None = None,
+        body: bytes | str | None = None,
+        cookies: CookiesT | None = None,
+        meta: dict[str, Any] | None = None,
+        encoding: str | None = None,
+        priority: int = 0,
+        dont_filter: bool = False,
+        errback: Callable[[Failure], Any] | None = None,
+        cb_kwargs: dict[str, Any] | None = None,
+        flags: list[str] | None = None,
+        css: str | None = None,
+        xpath: str | None = None,
+    ) -> Iterable[Request]:
+        """
+        A generator that produces :class:`~.Request` instances to follow all
+        links in ``urls``. It accepts the same arguments as the :class:`~.Request`'s
+        ``__init__()`` method, except that each ``urls`` element does not need to be
+        an absolute URL, it can be any of the following:
+
+        * a relative URL
+        * a :class:`~scrapy.link.Link` object, e.g. the result of
+          :ref:`topics-link-extractors`
+        * a :class:`~scrapy.Selector` object for a ``<link>`` or ``<a>`` element, e.g.
+          ``response.css('a.my_link')[0]``
+        * an attribute :class:`~scrapy.Selector` (not SelectorList), e.g.
+          ``response.css('a::attr(href)')[0]`` or
+          ``response.xpath('//img/@src')[0]``
+
+        In addition, ``css`` and ``xpath`` arguments are accepted to perform the link extraction
+        within the ``follow_all()`` method (only one of ``urls``, ``css`` and ``xpath`` is accepted).
+
+        Note that when passing a ``SelectorList`` as argument for the ``urls`` parameter or
+        using the ``css`` or ``xpath`` parameters, this method will not produce requests for
+        selectors from which links cannot be obtained (for instance, anchor tags without an
+        ``href`` attribute)
+
+        .. seealso:: :meth:`.Response.follow_all`, for a caution about mutable
+            *meta* and *cb_kwargs* values.
+        """
+        arguments = [x for x in (urls, css, xpath) if x is not None]
+        if len(arguments) != 1:
+            raise ValueError(
+                "Please supply exactly one of the following arguments: urls, css, xpath"
+            )
+        if not urls:
+            if css:
+                urls = self.css(css)
+            if xpath:
+                urls = self.xpath(xpath)
+        if isinstance(urls, parsel.SelectorList):
+            selectors = urls
+            urls = []
+            for sel in selectors:
+                with suppress(_InvalidSelector):
+                    urls.append(_url_from_selector(sel))
+        return super().follow_all(
+            urls=cast("Iterable[str | Link]", urls),
+            callback=callback,
+            method=method,
+            headers=headers,
+            body=body,
+            cookies=cookies,
+            meta=meta,
+            encoding=encoding,
+            priority=priority,
+            dont_filter=dont_filter,
+            errback=errback,
+            cb_kwargs=cb_kwargs,
+            flags=flags,
+        )
+
+
+class _InvalidSelector(ValueError):
+    """
+    Raised when a URL cannot be obtained from a Selector
+    """
+
+
+def _url_from_selector(sel: parsel.Selector) -> str:
+    if isinstance(sel.root, str):
+        # e.g. ::attr(href) result
+        return strip_html5_whitespace(sel.root)
+    if not hasattr(sel.root, "tag"):
+        raise _InvalidSelector(f"Unsupported selector: {sel}")
+    if sel.root.tag not in {"a", "link"}:
+        raise _InvalidSelector(
+            f"Only <a> and <link> elements are supported; got <{sel.root.tag}>"
+        )
+    href = sel.root.get("href")
+    if href is None:
+        raise _InvalidSelector(f"<{sel.root.tag}> element has no href attribute: {sel}")
+    return strip_html5_whitespace(href)

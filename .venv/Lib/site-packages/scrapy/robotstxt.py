@@ -1,0 +1,156 @@
+from __future__ import annotations
+
+import warnings
+from abc import ABCMeta, abstractmethod
+from typing import TYPE_CHECKING, Self, cast
+from urllib.robotparser import RobotFileParser
+
+from protego import Protego
+
+from scrapy.exceptions import ScrapyDeprecationWarning
+from scrapy.utils.python import to_unicode
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from scrapy import Spider
+    from scrapy.crawler import Crawler
+
+
+def decode_robotstxt(
+    robotstxt_body: bytes,
+    spider: Spider | None = None,
+    to_native_str_type: bool | None = None,
+) -> str:
+    if spider is not None:  # pragma: no cover
+        warnings.warn(
+            "Passing a spider argument to decode_robotstxt() is "
+            "deprecated and has no effect.",
+            category=ScrapyDeprecationWarning,
+            stacklevel=2,
+        )
+    if to_native_str_type is not None:  # pragma: no cover
+        warnings.warn(
+            "Passing a to_native_str_type argument to decode_robotstxt() is "
+            "deprecated and has no effect.",
+            category=ScrapyDeprecationWarning,
+            stacklevel=2,
+        )
+    return robotstxt_body.decode("utf-8-sig", errors="ignore")
+
+
+class RobotParser(metaclass=ABCMeta):
+    @classmethod
+    @abstractmethod
+    def from_crawler(cls, crawler: Crawler, robotstxt_body: bytes) -> Self:
+        """Parse the content of a robots.txt_ file as bytes. This must be a class method.
+        It must return a new instance of the parser backend.
+
+        :param crawler: crawler which made the request
+        :type crawler: :class:`~scrapy.crawler.Crawler` instance
+
+        :param robotstxt_body: content of a robots.txt_ file.
+        :type robotstxt_body: bytes
+        """
+
+    @abstractmethod
+    def allowed(self, url: str | bytes, user_agent: str | bytes) -> bool:
+        """Return ``True`` if  ``user_agent`` is allowed to crawl ``url``, otherwise return ``False``.
+
+        :param url: Absolute URL
+        :type url: str or bytes
+
+        :param user_agent: User agent
+        :type user_agent: str or bytes
+        """
+
+    def crawl_delay(self, user_agent: str | bytes) -> float | None:
+        """Return the ``Crawl-delay`` directive for ``user_agent`` as a number
+        of seconds, or ``None`` if it is not set or the backend does not support
+        it.
+
+        .. versionadded:: 2.18.0
+        """
+        return None
+
+    def sitemaps(self) -> Iterable[str]:
+        """Return the sitemap URLs declared through the ``Sitemap`` directive
+        of the robots.txt file, or an empty iterable if there are none or the
+        backend does not support reading them.
+
+        .. versionadded:: 2.20.0
+        """
+        return ()
+
+
+class PythonRobotParser(RobotParser):
+    def __init__(self, robotstxt_body: bytes, spider: Spider | None):
+        self.spider: Spider | None = spider
+        body_decoded = decode_robotstxt(robotstxt_body)
+        self.rp: RobotFileParser = RobotFileParser()
+        self.rp.parse(body_decoded.splitlines())
+
+    @classmethod
+    def from_crawler(cls, crawler: Crawler, robotstxt_body: bytes) -> Self:
+        spider = None if not crawler else crawler.spider
+        return cls(robotstxt_body, spider)
+
+    def allowed(self, url: str | bytes, user_agent: str | bytes) -> bool:
+        user_agent = to_unicode(user_agent)
+        url = to_unicode(url)
+        return self.rp.can_fetch(user_agent, url)
+
+    def crawl_delay(self, user_agent: str | bytes) -> float | None:
+        delay = self.rp.crawl_delay(to_unicode(user_agent))
+        return None if delay is None else float(delay)
+
+
+class RerpRobotParser(RobotParser):
+    def __init__(self, robotstxt_body: bytes, spider: Spider | None):
+        from robotexclusionrulesparser import RobotExclusionRulesParser  # noqa: PLC0415
+
+        self.spider: Spider | None = spider
+        self.rp: RobotExclusionRulesParser = RobotExclusionRulesParser()
+        body_decoded = decode_robotstxt(robotstxt_body)
+        self.rp.parse(body_decoded)
+
+    @classmethod
+    def from_crawler(cls, crawler: Crawler, robotstxt_body: bytes) -> Self:
+        spider = None if not crawler else crawler.spider
+        return cls(robotstxt_body, spider)
+
+    def allowed(self, url: str | bytes, user_agent: str | bytes) -> bool:
+        user_agent = to_unicode(user_agent)
+        url = to_unicode(url)
+        return cast("bool", self.rp.is_allowed(user_agent, url))
+
+    def crawl_delay(self, user_agent: str | bytes) -> float | None:
+        delay = self.rp.get_crawl_delay(to_unicode(user_agent))
+        return None if delay is None else float(delay)
+
+    def sitemaps(self) -> Iterable[str]:
+        return cast("Iterable[str]", self.rp.sitemaps)
+
+
+class ProtegoRobotParser(RobotParser):
+    def __init__(self, robotstxt_body: bytes, spider: Spider | None):
+        self.spider: Spider | None = spider
+        body_decoded = decode_robotstxt(robotstxt_body)
+        self.rp = Protego.parse(body_decoded)
+
+    @classmethod
+    def from_crawler(cls, crawler: Crawler, robotstxt_body: bytes) -> Self:
+        spider = None if not crawler else crawler.spider
+        return cls(robotstxt_body, spider)
+
+    def allowed(self, url: str | bytes, user_agent: str | bytes) -> bool:
+        user_agent = to_unicode(user_agent)
+        url = to_unicode(url)
+        return self.rp.can_fetch(url, user_agent)
+
+    def crawl_delay(self, user_agent: str | bytes) -> float | None:
+        delay = self.rp.crawl_delay(to_unicode(user_agent))
+        return None if delay is None else float(delay)
+
+    def sitemaps(self) -> Iterable[str]:
+        return self.rp.sitemaps
