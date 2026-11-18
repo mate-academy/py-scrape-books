@@ -1,6 +1,8 @@
 import scrapy
 from scrapy.http import Response
 
+from books_scraper.items import BookItem
+
 RATING_MAP = {
     "One": 1,
     "Two": 2,
@@ -28,17 +30,15 @@ class BooksSpider(scrapy.Spider):
 
     def parse_book(self, response: Response):
         """Step 2: parse a single book page."""
-        yield {
-            "title": response.css("h1::text").get(),
-            "price": self._parse_price(response),
-            "amount_in_stock": self._parse_amount_in_stock(response),
-            "rating": self._parse_rating(response),
-            "category": self._parse_category(response),
-            "description": response.css(
-                "#product_description + p::text"
-            ).get(),
-            "upc": self._parse_upc(response),
-        }
+        yield BookItem(
+            title=response.css("h1::text").get(),
+            price=self._parse_price(response),
+            amount_in_stock=self._parse_amount_in_stock(response),
+            rating=self._parse_rating(response),
+            category=self._parse_category(response),
+            description=response.css("#product_description + p::text").get(),
+            upc=self._parse_upc(response),
+        )
 
     @staticmethod
     def _parse_price(response: Response) -> float:
