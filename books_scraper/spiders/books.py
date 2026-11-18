@@ -3,6 +3,8 @@ from typing import Iterator, Optional
 import scrapy
 from scrapy.http import Response
 
+from books_scraper.items import BooksScraperItem
+
 RATINGS = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
 
 
@@ -21,22 +23,20 @@ class BooksSpider(scrapy.Spider):
         if next_page:
             yield response.follow(next_page, callback=self.parse)
 
-    def parse_book(self, response: Response) -> dict:
-        return {
-            "title": response.css("div.product_main h1::text").get(),
-            "price": self.parse_price(response),
-            "amount_in_stock": self.parse_amount_in_stock(response),
-            "rating": self.parse_rating(response),
-            "category": response.css(
+    def parse_book(self, response: Response) -> Iterator[BooksScraperItem]:
+        yield BooksScraperItem(
+            title=response.css("div.product_main h1::text").get(),
+            price=self.parse_price(response),
+            amount_in_stock=self.parse_amount_in_stock(response),
+            rating=self.parse_rating(response),
+            category=response.css(
                 "ul.breadcrumb li:nth-child(3) a::text"
             ).get(),
-            "description": response.css(
-                "#product_description + p::text"
-            ).get(),
-            "upc": response.xpath(
+            description=response.css("#product_description + p::text").get(),
+            upc=response.xpath(
                 "//th[text()='UPC']/following-sibling::td/text()"
             ).get(),
-        }
+        )
 
     @staticmethod
     def parse_price(response: Response) -> float:
