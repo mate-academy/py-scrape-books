@@ -4,4 +4,8 @@ ignore = E203, E266, W503, ANN002, ANN003, ANN101, ANN102, ANN401, N807, N818
 max-line-length = 79
 max-complexity = 18
 select = B,C,E,F,W,T4,B9,ANN,Q0,N8,VNE
-exclude = venv, tests
+exclude = .venv, venv, tests
+per-file-ignores =
+    book_scraper/middlewares.py: ANN001,ANN201,ANN206,VNE001,F401
+    book_scraper/pipelines.py: ANN001,ANN201,F401
+    book_scraper/settings.py: E265,E501
