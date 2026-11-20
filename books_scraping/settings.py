@@ -13,6 +13,7 @@ FEED_EXPORT_ENCODING = "utf-8"
 FEEDS = {
     "books.jl": {
         "format": "jsonlines",
-        "mode": "overwrite",
+        "encoding": "utf8",
+        "overwrite": "true",
     },
 }
