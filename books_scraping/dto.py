@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class BookItem:
+class BookDTO:
     title: str
     price: float
     amount_in_stock: int

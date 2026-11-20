@@ -1,7 +1,7 @@
 BOT_NAME = "books"
 
-SPIDER_MODULES = ["books.spiders"]
-NEWSPIDER_MODULE = "books.spiders"
+SPIDER_MODULES = ["books_scraping.spiders"]
+NEWSPIDER_MODULE = "books_scraping.spiders"
 
 ROBOTSTXT_OBEY = True
 

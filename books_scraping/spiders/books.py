@@ -3,7 +3,7 @@ from collections.abc import Iterator
 import scrapy
 from scrapy.http import Response
 
-from books.dto import BookItem
+from books_scraping.dto import BookDTO
 
 
 RATINGS = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
@@ -21,8 +21,8 @@ class BooksSpider(scrapy.Spider):
         next_page = response.css("li.next a::attr(href)").get()
         if next_page is not None:
             yield response.follow(next_page, callback=self.parse)
-    def parse_book(self, response: Response) -> Iterator[BookItem]:
-        yield BookItem(
+    def parse_book(self, response: Response) -> Iterator[BookDTO]:
+        yield BookDTO(
             title=response.css(".product_main h1::text").get(),
             price=self.parse_price(response),
             amount_in_stock=self.parse_amount_in_stock(response),
