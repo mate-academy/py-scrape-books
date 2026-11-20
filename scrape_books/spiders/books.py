@@ -1,11 +1,8 @@
 from typing import Generator
 
 import scrapy
-from scrapy import Spider
 from scrapy.http import Response
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from twisted.internet.defer import Deferred
+
 
 numbers = {
     "One": 1,
@@ -21,65 +18,47 @@ class BooksSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.driver = webdriver.Chrome()
-
-    def close(self: Spider, reason: str) -> Deferred[None] | None:
-        self.driver.close()
-        return self.close(reason)
-
     def parse(self, response: Response) -> Generator:
         for book in response.css(".product_pod"):
-            absolute_url = response.urljoin(book.css("a::attr(href)").get())
-            self.driver.get(absolute_url)
-            yield {
-                "title": book.css("a::attr(title)").get(),
-                "price": float(book.css(".price_color::text").get()[1:]),
-                "amount_in_stock": self._get_book_amount_in_stock(),
-                "rating": numbers[
-                    book.css(".star-rating::attr(class)").get().split()[1]
-                ],
-                "category": self._get_book_category(),
-                "description": self._get_book_description(),
-                "upc": self._get_book_upc(),
-            }
+            href = book.css("a::attr(href)").get()
+            book_page = response.follow(href, callback=self.parse_book)
+
+            yield book_page
 
         next_page = response.css(".pager .next a::attr(href)").get()
         if next_page is not None:
             yield response.follow(next_page, callback=self.parse)
 
-    def _get_book_amount_in_stock(self) -> int:
-        amount_in_stock = (
-            self.driver
-            .find_element(By.CLASS_NAME, "instock")
-            .text.split()
-        )[2][1:]
-        return int(amount_in_stock)
+    def parse_book(self, response: Response) -> Generator:
 
-    def _get_book_category(self) -> str:
-        category = (
-            self.driver
-            .find_element(By.CLASS_NAME, "breadcrumb")
-            .find_elements(By.TAG_NAME, "a")[2]
-            .text
+        title = response.css(".product_main h1::text").get()
+
+        price = float(response.css(".price_color::text").get()[1:])
+
+        amount_in_stock = int(
+            response.css(".product_main .instock::text")[-1].get()
+            .split()[2][1:]
         )
-        return category
 
-    def _get_book_description(self) -> str:
+        rating = numbers[
+            response.css(".star-rating::attr(class)").get().split()[1]
+        ]
+
+        category = response.css(".breadcrumb").css("a::text")[2].get()
+
         description = (
-            self.driver
-            .find_element(By.ID, "product_description")
-            .find_element(By.XPATH, "./following-sibling::p[1]")
-            .text
+            response.css("#product_description")
+            .xpath("./following-sibling::p[1]/text()").get()
         )
-        return description
 
-    def _get_book_upc(self) -> str:
-        upc = (
-            self.driver
-            .find_element(By.CLASS_NAME, "table")
-            .find_element(By.XPATH, ".//td")
-            .text
-        )
-        return upc
+        upc = response.css("table td::text").get()
+
+        yield {
+            "title": title,
+            "price": price,
+            "amount_in_stock": amount_in_stock,
+            "rating": rating,
+            "category": category,
+            "description": description,
+            "upc": upc,
+        }
