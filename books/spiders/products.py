@@ -1,5 +1,4 @@
 import re
-
 import scrapy
 
 
@@ -24,10 +23,6 @@ class ProductsSpider(scrapy.Spider):
             )
 
     def parse_book(self, response):
-        # rating_class = response.css(
-        #     "p.star-rating::attr(class)"
-        # ).get()
-        #
         rating_map = {
             "One": 1,
             "Two": 2,
@@ -35,8 +30,6 @@ class ProductsSpider(scrapy.Spider):
             "Four": 4,
             "Five": 5
         }
-        #
-        # rating = rating_class.split()[-1] if rating_class else None
 
         yield {
             "title": response.css(".product_main h1::text").get(),
@@ -44,13 +37,6 @@ class ProductsSpider(scrapy.Spider):
                 response.css(".price_color::text").get().replace("£", "")
             ),
 
-            # "amount_in_stock": int(
-            #     response.css(".availability::text").get().rstrip("In stock (").lstrip(" available)")
-            # ),
-            # "rating": rating_map.get(rating),
-            # "category": response.css("ul.breadcrumb li:nth-last-child(2) a::text").get(),
-            # "description": response.css(".product_page p::text").get(),
-            # "upc": response.xpath("//th[text()='UPC']/following-sibling::td/text()").get()
             "amount_in_stock": int(
                 re.search(
                     r"\((\d+)",
