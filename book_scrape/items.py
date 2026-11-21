@@ -12,7 +12,7 @@ class BookScrapeItem:
     # name: str | None = None
     title: str
     price: float
-    amount_of_stock: int
+    amount_in_stock: int
     rating: int
     category: str
     description: str
