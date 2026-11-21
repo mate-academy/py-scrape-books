@@ -87,3 +87,10 @@ DOWNLOAD_DELAY = 1
 DOWNLOADER_MIDDLEWARE_RESPONSE_EXCEPTIONS = True
 FEED_EXPORT_ENCODING = "utf-8"
 FEED_MODE = "create"
+FEEDS = {
+    "books.jl": {
+        "format": "jsonlines",
+        "encoding": "utf8",
+        "overwrite": True,
+    },
+}

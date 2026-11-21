@@ -10,4 +10,10 @@ from dataclasses import dataclass
 class BookScrapeItem:
     # define the fields for your item here like:
     # name: str | None = None
-    pass
+    title: str
+    price: float
+    amount_of_stock: int
+    rating: int
+    category: str
+    description: str
+    upc: str
