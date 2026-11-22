@@ -3,6 +3,7 @@ from typing import Generator
 import scrapy
 from scrapy.http import Response
 
+from scrape_books.items import ScrapeBooksItem
 
 numbers = {
     "One": 1,
@@ -53,12 +54,12 @@ class BooksSpider(scrapy.Spider):
 
         upc = response.css("table td::text").get()
 
-        yield {
-            "title": title,
-            "price": price,
-            "amount_in_stock": amount_in_stock,
-            "rating": rating,
-            "category": category,
-            "description": description,
-            "upc": upc,
-        }
+        yield ScrapeBooksItem(
+            title=title,
+            price=price,
+            amount_in_stock=amount_in_stock,
+            rating=rating,
+            category=category,
+            description=description,
+            upc=upc,
+        )

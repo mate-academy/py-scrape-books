@@ -58,9 +58,9 @@ DOWNLOAD_DELAY = 1
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    "scrape_books.pipelines.ScrapeBooksPipeline": 300,
-#}
+ITEM_PIPELINES = {
+   "scrape_books.pipelines.ScrapeBooksPipeline": 300,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
@@ -86,4 +86,9 @@ DOWNLOAD_DELAY = 1
 # Set settings whose default value is deprecated to a future-proof value
 DOWNLOADER_MIDDLEWARE_RESPONSE_EXCEPTIONS = True
 FEED_EXPORT_ENCODING = "utf-8"
-FEED_MODE = "create"
+FEED_MODE = {
+    "books.jl": {
+        "format": "jsonlines",
+        "overwrite": True,
+    }
+}
