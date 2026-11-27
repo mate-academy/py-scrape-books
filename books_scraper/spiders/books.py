@@ -20,7 +20,7 @@ class BooksSpider(scrapy.Spider):
 
     def parse(self, response: Response, **kwargs) -> Generator:
         yield from response.follow_all(
-            css="article.product_pod h3 a",
+            response.css("article.product_pod h3 a"),
             callback=self.parse_book,
         )
 
